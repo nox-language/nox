@@ -1,16 +1,27 @@
+use std::fs::File;
+use std::str::FromStr;
+
 use cranelift::prelude::{
     AbiParam,
+    Configurable,
     FunctionBuilder,
     FunctionBuilderContext,
     InstBuilder,
     Value,
+    isa,
+    settings,
 };
 use cranelift_module::{
     DataContext,
     Linkage,
     Module,
 };
-use cranelift_simplejit::{SimpleJITBackend, SimpleJITBuilder};
+use cranelift_faerie::{
+    FaerieBackend,
+    FaerieBuilder,
+    FaerieTrapCollection,
+};
+use target_lexicon::triple;
 
 use crate::ast::{
     Declaration,
@@ -20,55 +31,74 @@ use crate::ast::{
     Expr::{FunctionCall, Str},
 };
 
-pub fn generate(declarations: Declarations) -> Result<*const u8, String> {
-    let builder = SimpleJITBuilder::new();
+pub fn generate(declarations: Declarations) -> Result<String, String> {
+    let object_file = "main.o".to_string();
+    let mut flag_builder = settings::builder();
+    flag_builder.enable("is_pic").expect("flag");
+    let isa_builder = isa::lookup(triple!("x86_64-unknown-unknown-elf")).expect("isa");
+    let isa = isa_builder.finish(settings::Flags::new(flag_builder));
+    let builder = FaerieBuilder::new(isa, object_file.clone(), FaerieTrapCollection::Disabled,
+        FaerieBuilder::default_libcall_names())
+        .expect("builder");
     let mut module = Module::new(builder);
     let mut builder_context = FunctionBuilderContext::new();
     let mut context = module.make_context();
     let mut data_context = DataContext::new();
-    let mut builder = FunctionBuilder::new(&mut context.func, &mut builder_context);
-    let entry_block = builder.create_ebb();
-    builder.append_ebb_params_for_function_params(entry_block);
-    builder.switch_to_block(entry_block);
-    builder.seal_block(entry_block);
-    let mut generator = Generator {
-        builder,
-        data_context: &mut data_context,
-        module: &mut module,
-    };
-    generator.gen_declarations(declarations)?;
-    generator.builder.ins().return_(&[]);
-    generator.builder.finalize();
+    for declaration in declarations {
+        let mut generator = FunctionGenerator {
+            builder: FunctionBuilder::new(&mut context.func, &mut builder_context),
+            data_context: &mut data_context,
+            module: &mut module,
+        };
+        generator.gen_declaration(declaration)?;
 
-    let ident = module.declare_function("main", Linkage::Export, &context.func.signature) // TODO: use function name.
-        .map_err(|error| error.to_string())?;
-    module.define_function(ident, &mut context)
-        .map_err(|error| error.to_string())?;
+        let ident = module.declare_function("main", Linkage::Export, &context.func.signature) // TODO: use function name.
+            .map_err(|error| error.to_string())?;
+        module.define_function(ident, &mut context)
+            .map_err(|error| error.to_string())?;
+    }
     module.clear_context(&mut context);
     module.finalize_definitions();
 
-    Ok(module.get_finalized_function(ident))
+    let object = module.finish();
+    let file = File::create(object.name()).expect("file create");
+    object.write(file).expect("error writing to file");
+
+    Ok(object_file)
 }
 
-struct Generator<'a> {
+struct FunctionGenerator<'a> {
     builder: FunctionBuilder<'a>,
     data_context: &'a mut DataContext,
-    module: &'a mut Module<SimpleJITBackend>,
+    module: &'a mut Module<FaerieBackend>,
 }
 
-impl<'a> Generator<'a> {
+impl<'a> FunctionGenerator<'a> {
     fn gen_declaration(&mut self, declaration: Declaration) -> Result<(), String> {
         match declaration {
             FunctionDeclaration { body, .. } => {
-                let _ = self.gen_expr(body)?;
-            },
-        }
-        Ok(())
-    }
+                let entry_block = self.builder.create_ebb();
+                self.builder.append_ebb_params_for_function_params(entry_block);
+                self.builder.switch_to_block(entry_block);
+                self.builder.seal_block(entry_block);
 
-    fn gen_declarations(&mut self, declarations: Declarations) -> Result<(), String> {
-        for declaration in declarations {
-            self.gen_declaration(declaration)?;
+                let _ = self.gen_expr(body)?;
+
+                //if name == "main" { // TODO
+                    let int = self.module.target_config().pointer_type();
+                    let mut signature = self.module.make_signature();
+                    signature.params.push(AbiParam::new(int));
+                    let callee = self.module.declare_function("exit", Linkage::Import, &signature)
+                        .expect("declare exit function");
+                    let local_callee = self.module.declare_func_in_func(callee, &mut self.builder.func);
+
+                    let argument_exprs = vec![self.builder.ins().iconst(int, 0)];
+                    self.builder.ins().call(local_callee, &argument_exprs);
+                //}
+
+                self.builder.ins().return_(&[]);
+                self.builder.finalize();
+            },
         }
         Ok(())
     }

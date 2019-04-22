@@ -6,5 +6,6 @@ edition = "2018"
 
 [dependencies]
 cranelift = "0.30"
+cranelift-faerie = "0.30"
 cranelift-module = "0.30"
-cranelift-simplejit = "0.30"
+target-lexicon = "0.3.0"
