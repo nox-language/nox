@@ -5,3 +5,6 @@ authors = ["Antoni Boucher <bouanto@zoho.com>"]
 edition = "2018"
 
 [dependencies]
+cranelift = "0.30"
+cranelift-module = "0.30"
+cranelift-simplejit = "0.30"
