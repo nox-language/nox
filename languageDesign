@@ -1,0 +1,55 @@
+refinement type for memory and thread safety:
+
+thread_spawn(value: T)
+    ensure is_unique(T)
+
+Essayer le langage Whiley.
+
+For ensuring no dangling reference
+
+let vector_get(&vector): &a
+
+let vector_push(&vector, a)
+    ensure is_unique(&vector)
+
+Can we generalize this to allow multiple mutable references on the vector?
+
+For ensuring memory deallocation, have post-condition like:
+
+let malloc(): ptr
+    ensure result == 0 || will_call(free(result))
+This seems complicated. Think about something else inspired by linear types, maybe:
+let malloc(): ptr
+    ensure result == 0 || will_consume(result)
+
+Think about uninitialized values (from malloc).
+No implicit free to avoid freeing uninitialized memory.
+Functions to work with uninitialized memory.
+
+Think about sharing data between threads:
+maybe allow the programmer to specify that a value is shareable:
+
+let spin_lock(): SpinLock
+    assume is_shareable(result)
+Markers are probably better for that? Does the compiler need to know the concept of shareability?
+
+Cannot return reference to local variable.
+Cannot move non-static reference to move function.
+
+Permissions are an alias for a precondition.
+
+perm mut(type) = is_unique(type)
+
+let vec_push(&mut self, element: T) // mut is the permission defined earlier.
+
+Markers are a way to say what a type is.
+
+mark Send
+
+assume(i32.is(Send))
+
+fn thread_spawn(callback: fn())
+    ensure callback.is(Send)
+
+To free memory at the end of a function:
+defer free()
