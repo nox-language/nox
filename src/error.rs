@@ -2,6 +2,7 @@ use std::io;
 
 use crate::position::Position;
 
+#[derive(Debug)]
 pub enum ErrorKind {
     Eof,
     Io(io::Error),
@@ -12,6 +13,7 @@ pub enum ErrorKind {
     UnexpectedChar(u8),
 }
 
+#[derive(Debug)]
 pub struct Error {
     pub kind: ErrorKind,
     pub position: Position,

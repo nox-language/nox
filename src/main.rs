@@ -10,9 +10,28 @@ mod token;
 
 use std::process::Command;
 
+use rlvm::{
+    initialize_native_target,
+    initialize_all_target_infos,
+    initialize_all_targets,
+    initialize_all_target_mcs,
+    initialize_all_asm_parsers,
+    initialize_all_asm_printers,
+    llvm_init,
+};
+
 use gen::generate;
 
 fn main() {
+    let _llvm = llvm_init();
+
+    initialize_all_target_infos();
+    initialize_all_targets();
+    initialize_all_target_mcs();
+    initialize_all_asm_parsers();
+    initialize_all_asm_printers();
+    initialize_native_target();
+
     match parser::parse("tests/1_main.nx") {
         Ok(declarations) => {
             let object_filename = generate(declarations).expect("generate");

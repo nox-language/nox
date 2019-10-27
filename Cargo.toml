@@ -5,7 +5,4 @@ authors = ["Antoni Boucher <bouanto@zoho.com>"]
 edition = "2018"
 
 [dependencies]
-cranelift = "0.30"
-cranelift-faerie = "0.30"
-cranelift-module = "0.30"
-target-lexicon = "0.3.0"
+rlvm = { path = "/home/bouanto/Ordinateur/Programmation/Rust/Projets/rlvm" }

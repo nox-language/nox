@@ -11,20 +11,23 @@ pub enum Expr {
 
 #[derive(Debug)]
 pub struct Parameter {
-    name: Symbol,
-    typ: Type,
+    pub name: Symbol,
+    pub typ: Type,
 }
 
 #[derive(Debug)]
 pub enum Declaration {
-    FunctionDeclaration {
-        body: Expr,
-        name: Symbol,
-        parameters: Vec<Parameter>,
-    },
+    Function(FunctionDeclaration),
 }
 
 pub type Declarations = Vec<Declaration>;
+
+#[derive(Debug)]
+pub struct FunctionDeclaration {
+    pub body: Expr,
+    pub name: Symbol,
+    pub parameters: Vec<Parameter>,
+}
 
 #[derive(Debug)]
 pub enum Type {

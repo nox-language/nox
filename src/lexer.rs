@@ -82,6 +82,7 @@ impl Buffer {
 pub struct Lexer {
     buffer: Buffer,
     next_token: Option<Token>,
+    symbol: u64,
 }
 
 impl Lexer {
@@ -89,6 +90,7 @@ impl Lexer {
         Ok(Self {
             buffer: Buffer::new(File::open(filename)?),
             next_token: None,
+            symbol: 0,
         })
     }
 
@@ -130,7 +132,8 @@ impl Lexer {
                 Ok(Token::Fun)
             }
             else {
-                Ok(Token::Ident(0)) // TODO
+                self.symbol += 1;
+                Ok(Token::Ident(self.symbol)) // TODO
             }
         }
     }

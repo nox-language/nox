@@ -1,8 +1,9 @@
 use crate::ast::{
     Declaration,
-    Declaration::FunctionDeclaration,
+    Declaration::Function,
     Declarations,
     Expr,
+    FunctionDeclaration,
 };
 use crate::error::{
     Error,
@@ -48,11 +49,11 @@ impl Parser {
         self.eat(Token::CloseParen)?;
         self.eat(Token::Equal)?;
         let body = self.expression()?;
-        Ok(FunctionDeclaration {
+        Ok(Function(FunctionDeclaration {
             body,
             name,
             parameters: vec![], // TODO
-        })
+        }))
     }
 
     fn declarations(&mut self) -> Result<Declarations> {

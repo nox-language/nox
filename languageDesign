@@ -53,3 +53,16 @@ fn thread_spawn(callback: fn())
 
 To free memory at the end of a function:
 defer free()
+
+Allow to use u8, u16, u32 and u64 instead of usize if their size (or value?) <= size_of(usize).
+Same for i8, i16, i32, i64 if they are greater than or equal to 0.
+
+Safe atomics: https://readthedocs.org/projects/ats-documentation/downloads/pdf/latest/
+
+Allow multiple shared references to the same array if we can prove that the indexes are different?
+
+Is the concept of lifetimes implicit or explicit in
+let vector_get(&vector, &useless): &a
+?
+If it's implicit, it means the compiler needs to do a whole program analysis before being able to infer the lifetimes here.
+Isn't it what the type inference do anyway?
