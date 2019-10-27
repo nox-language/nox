@@ -5,4 +5,4 @@ authors = ["Antoni Boucher <bouanto@zoho.com>"]
 edition = "2018"
 
 [dependencies]
-rlvm = { path = "/home/bouanto/Ordinateur/Programmation/Rust/Projets/rlvm" }
+rlvm = "0.0.1"
