@@ -1,207 +1,370 @@
-use std::fs::File;
-use std::io::{self, Read};
+/*
+ * Copyright (c) 2017-2019 Boucher, Antoni <bouanto@zoho.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
-use crate::error::{Error, ErrorKind, Result};
-use crate::position::Position;
-use crate::token::Token;
+use std::char;
+use std::io::{Bytes, Read};
+use std::iter::Peekable;
+use std::result;
 
-struct Buffer {
-    buffer: Vec<u8>,
-    file: File,
-    index: usize,
-    len: usize,
-    next_byte: Option<u8>,
-    position: Position,
+use error::Error::{self, Eof, InvalidEscape, Msg, Unclosed, UnknownToken};
+use position::Pos;
+use token::{Tok, Token};
+use token::Tok::*;
+
+pub type Result<T> = result::Result<T, Error>;
+
+pub struct Lexer<R: Read> {
+    bytes_iter: Peekable<Bytes<R>>,
+    pos: Pos,
+    saved_pos: Pos,
 }
 
-impl Buffer {
-    fn new(file: File) -> Self {
-        Self {
-            buffer: vec![0; 4096],
-            file,
-            index: 0,
-            len: 0,
-            next_byte: None,
-            position: Position::new(),
+impl<R: Read> Lexer<R> {
+    pub fn new(reader: R) -> Self {
+        Lexer {
+            bytes_iter: reader.bytes().peekable(),
+            pos: Pos::new(1, 1),
+            saved_pos: Pos::new(1, 1),
         }
     }
 
-    fn error(&self, error_kind: ErrorKind) -> Error {
-        Error::new(error_kind, self.position)
+    fn advance(&mut self) -> Result<()> {
+        match self.bytes_iter.next() {
+            Some(Ok(b'\n')) => {
+                self.pos.line += 1;
+                self.pos.column = 1;
+            },
+            Some(Err(error)) => return Err(error.into()),
+            None => return Err(Eof),
+            _ => self.pos.column += 1,
+        }
+        Ok(())
     }
 
-    fn is_empty(&self) -> bool {
-        self.len == 0
+    fn colon_and_optional_equal(&mut self) -> Result<Token> {
+        self.two_char_token(vec![('=', ColonEqual)], Colon)
     }
 
-    fn advance(&mut self) -> Result<u8> {
-        match self.next_byte.take() {
-            Some(next_byte) => Ok(next_byte),
-            None => {
-                if self.is_empty() {
-                    match self.file.read(&mut self.buffer) {
-                        Ok(size) => self.len = size,
-                        Err(error) => return self.result(ErrorKind::Io(error)),
+    fn comment(&mut self) -> Result<()> {
+        let mut depth = 1;
+        loop {
+            self.advance()?;
+            let ch = self.current_char()?;
+            // Check for nested comment.
+            if ch == '/' {
+                self.advance()?;
+                let ch = self.current_char()?;
+                if ch == '*' {
+                    depth += 1;
+                }
+            }
+            // Check for end of comment.
+            if ch == '*' {
+                self.advance()?;
+                let ch = self.current_char()?;
+                if ch == '/' {
+                    depth -= 1;
+                    if depth == 0 {
+                        self.advance()?;
+                        break;
                     }
                 }
-                if self.index >= self.len {
-                    return self.result(ErrorKind::Eof);
-                }
-                let byte = self.buffer.get(self.index).map(|&byte| byte);
-                self.index += 1;
-                if self.index >= self.len {
-                    self.len = 0;
-                    self.index = 0;
-                }
-                byte.map(|byte| {
-                    if byte == b'\n' {
-                        self.position.line += 1;
-                        self.position.column = 1;
-                    }
-                    byte
-                }).ok_or_else(|| self.error(ErrorKind::Eof))
             }
         }
+        Ok(())
     }
 
-    fn peek(&mut self) -> Option<u8> {
-        match self.next_byte {
-            Some(next_byte) => Some(next_byte),
-            None => {
-                self.next_byte = self.advance().ok();
-                self.next_byte
-            },
+    fn current_char(&mut self) -> Result<char> {
+        if let Some(&Ok(byte)) = self.bytes_iter.peek() {
+            return Ok(byte as char);
+        }
+
+        match self.bytes_iter.next() {
+            Some(Ok(_)) => unreachable!(),
+            Some(Err(error)) => Err(error.into()),
+            None => Err(Eof),
         }
     }
 
-    fn result<A>(&self, error_kind: ErrorKind) -> Result<A> {
-        Err(self.error(error_kind))
+    fn current_pos(&self) -> Pos {
+        self.pos
     }
-}
 
-pub struct Lexer {
-    buffer: Buffer,
-    next_token: Option<Token>,
-    symbol: u64,
-}
+    fn eat(&mut self, ch: char) -> Result<()> {
+        if self.current_char()? != ch {
+            panic!("Expected character `{}`, but found `{}`.", ch, self.current_char()?);
+        }
+        self.advance()
+    }
 
-impl Lexer {
-    pub fn new(filename: &str) -> io::Result<Self> {
-        Ok(Self {
-            buffer: Buffer::new(File::open(filename)?),
-            next_token: None,
-            symbol: 0,
+    fn escape_ascii_code(&mut self, pos: Pos) -> Result<char> {
+        let buffer = self.take_while(char::is_numeric)?;
+        if buffer.len() == 3 {
+            // The buffer only contains digit, hence unwrap().
+            let ascii_code = buffer.parse().unwrap();
+            match char::from_u32(ascii_code) {
+                Some(ch) => Ok(ch),
+                None => Err(Msg(format!("Invalid ascii code {}", ascii_code))),
+            }
+        }
+        else {
+            Err(InvalidEscape {
+                escape: buffer,
+                pos,
+            })
+        }
+    }
+
+    fn escape_char(&mut self, pos: Pos) -> Result<char> {
+        let escaped_char =
+            match self.current_char()? {
+                'n' => '\n',
+                't' => '\t',
+                '\\' => '\\',
+                '"' => '"',
+                ch if ch.is_digit(10) => return self.escape_ascii_code(pos),
+                escape => return Err(InvalidEscape {
+                    escape: escape.to_string(),
+                    pos,
+                }),
+            };
+        self.advance()?;
+        Ok(escaped_char)
+    }
+
+    fn greater_or_greater_equal(&mut self) -> Result<Token> {
+        self.two_char_token(vec![('=', GreaterOrEqual)], Greater)
+    }
+
+    fn identifier(&mut self) -> Result<Token> {
+        let ident = self.take_while(|ch| ch.is_alphanumeric() || ch == '_')?;
+        let token =
+            match ident.as_str() {
+                "array" => Array,
+                "break" => Break,
+                "do" => Do,
+                "else" => Else,
+                "end" => End,
+                "for" => For,
+                "function" => Function,
+                "if" => If,
+                "in" => In,
+                "let" => Let,
+                "nil" => Nil,
+                "of" => Of,
+                "then" => Then,
+                "to" => To,
+                "type" => Type,
+                "var" => Var,
+                "while" => While,
+                _ => Ident(ident),
+            };
+        self.make_token(token)
+    }
+
+    fn integer(&mut self) -> Result<Token> {
+        let buffer = self.take_while(char::is_numeric)?;
+        // The buffer only contains digit, hence unwrap().
+        self.make_token(Int(buffer.parse().unwrap()))
+    }
+
+    fn lesser_or_lesser_equal_or_not_equal(&mut self) -> Result<Token> {
+        self.two_char_token(vec![('=', LesserOrEqual), ('>', NotEqual)], Lesser)
+    }
+
+    fn make_token(&self, token: Tok) -> Result<Token> {
+        Ok(Token {
+            start: self.saved_pos,
+            token,
         })
     }
 
-    fn error(&self, error_kind: ErrorKind) -> Error {
-        Error::new(error_kind, self.buffer.position)
+    fn save_start(&mut self) {
+        self.saved_pos = self.current_pos();
     }
 
-    fn ident(&mut self) -> Result<Token> {
-        let mut ident = vec![];
+    fn simple_token(&mut self, token: Tok) -> Result<Token> {
+        let start = self.pos;
+        self.advance()?;
+        Ok(Token {
+            start,
+            token,
+        })
+    }
+
+    fn skip_until_slash(&mut self) -> Result<()> {
         loop {
-            match self.peek() {
-                Err(error) =>
-                    if let ErrorKind::Eof = error.kind {
-                        break;
-                    }
-                    else {
-                        return Err(error);
-                    },
-                Ok(byte) =>
-                    match byte {
-                        b'a' ..= b'z' | b'A' ..= b'Z' | b'0' ..= b'9' => {
-                            ident.push(byte);
-                            if let Err(error) = self.buffer.advance() {
-                                if let ErrorKind::Eof = error.kind {
-                                    break;
-                                }
-                                return Err(error);
-                            }
-                        },
-                        _ => break,
-                    }
+            let ch = self.current_char()?;
+            if ch == '\\' {
+                self.advance()?;
+                break;
             }
+            else if !ch.is_whitespace() {
+                return Err(UnknownToken {
+                    pos: self.current_pos(),
+                    start: ch,
+                });
+            }
+            self.advance()?;
         }
-        if ident.is_empty() { // TODO: might not be necessary.
-            self.result(ErrorKind::Eof)
+        Ok(())
+    }
+
+    fn slash_or_comment(&mut self) -> Result<Token> {
+        self.save_start();
+        self.advance()?;
+        if self.current_char()? == '*' {
+            match self.comment() {
+                Err(Eof) => return Err(Unclosed {
+                    pos: self.saved_pos,
+                    token: "comment",
+                }),
+                Err(error) => return Err(error),
+                _ => (),
+            }
+            self.token()
         }
         else {
-            if ident == b"fun" {
-                Ok(Token::Fun)
-            }
-            else {
-                self.symbol += 1;
-                Ok(Token::Ident(self.symbol)) // TODO
-            }
+            self.make_token(Slash)
         }
-    }
-
-    pub fn next_token(&mut self) -> Result<Token> {
-        match self.next_token.take() {
-            Some(token) => Ok(token),
-            None => self.token(),
-        }
-    }
-
-    fn peek(&mut self) -> Result<u8> {
-        self.buffer.peek().ok_or_else(|| self.error(ErrorKind::Eof))
-    }
-
-    pub fn peek_token(&mut self) -> Result<&Token> {
-        match self.next_token {
-            Some(ref token) => Ok(token),
-            None => {
-                self.next_token = Some(self.token()?);
-                self.peek_token()
-            },
-        }
-    }
-
-    pub fn position(&self) -> Position {
-        self.buffer.position
-    }
-
-    fn result<A>(&self, error_kind: ErrorKind) -> Result<A> {
-        Err(self.error(error_kind))
     }
 
     fn string(&mut self) -> Result<Token> {
-        let mut string = String::new();
-        assert_eq!(self.buffer.advance()?, b'"');
-        loop {
-            match self.buffer.advance()? {
-                b'"' => break,
-                byte => string.push(byte as char),
+        let result = {
+            self.save_start();
+            let mut string = String::new();
+            self.eat('"')?;
+            let mut ch = self.current_char()?;
+            while ch != '"' {
+                // Look for escaped character.
+                if ch == '\\' {
+                    let pos = self.current_pos();
+                    self.advance()?;
+                    if self.current_char()?.is_whitespace() {
+                        self.skip_until_slash()?;
+                    }
+                    else {
+                        string.push(self.escape_char(pos)?);
+                    }
+                }
+                else {
+                    string.push(ch);
+                    self.advance()?;
+                }
+                ch = self.current_char()?;
             }
+            self.eat('"')?;
+            self.make_token(Str(string))
+        };
+        match result {
+            Err(Eof) => Err(Unclosed {
+                pos: self.saved_pos,
+                token: "string",
+            }),
+            _ => result,
         }
-        Ok(Token::Str(string))
     }
 
-    fn token(&mut self) -> Result<Token> {
-        let token =
-            match self.peek()? {
-                b'=' => {
-                    self.buffer.advance()?;
-                    Token::Equal
-                },
-                b'(' => {
-                    self.buffer.advance()?;
-                    Token::OpenParen
-                },
-                b')' => {
-                    self.buffer.advance()?;
-                    Token::CloseParen
-                },
-                b'a' ..= b'z' | b'A' ..= b'Z' => return self.ident(),
-                b'"' => return self.string(),
-                b' ' | b'\n' | b'\r' => {
-                    self.buffer.advance()?;
-                    return self.token();
-                },
-                byte => return self.result(ErrorKind::UnexpectedChar(byte)),
+    fn take_while<F: Fn(char) -> bool>(&mut self, pred: F) -> Result<String> {
+        self.save_start();
+        let mut buffer = String::new();
+        buffer.push(self.current_char()?);
+        self.advance()?;
+        let mut ch = self.current_char()?;
+        while pred(ch) {
+            buffer.push(ch);
+            self.advance()?;
+            ch = self.current_char()?;
+        }
+        Ok(buffer)
+    }
+
+    #[allow(cyclomatic_complexity)]
+    pub fn token(&mut self) -> Result<Token> {
+        if let Some(&Ok(ch)) = self.bytes_iter.peek() {
+            return match ch {
+                b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.identifier(),
+                b'0'..=b'9' => self.integer(),
+                b' ' | b'\n' | b'\t' => {
+                    self.advance()?;
+                    self.token()
+                }
+                b'=' => self.simple_token(Equal),
+                b'&' => self.simple_token(Ampersand),
+                b'|' => self.simple_token(Pipe),
+                b'.' => self.simple_token(Dot),
+                b',' => self.simple_token(Comma),
+                b';' => self.simple_token(Semicolon),
+                b'*' => self.simple_token(Star),
+                b'+' => self.simple_token(Plus),
+                b'-' => self.simple_token(Minus),
+                b'{' => self.simple_token(OpenCurly),
+                b'}' => self.simple_token(CloseCurly),
+                b'(' => self.simple_token(OpenParen),
+                b')' => self.simple_token(CloseParen),
+                b'[' => self.simple_token(OpenSquare),
+                b']' => self.simple_token(CloseSquare),
+                b':' => self.colon_and_optional_equal(),
+                b'>' => self.greater_or_greater_equal(),
+                b'<' => self.lesser_or_lesser_equal_or_not_equal(),
+                b'/' => self.slash_or_comment(),
+                b'"' => self.string(),
+                _ => Err(UnknownToken {
+                    pos: self.current_pos(),
+                    start: ch as char,
+                }),
             };
-        Ok(token)
+        }
+        match self.bytes_iter.next() {
+            Some(Ok(_)) => unreachable!(),
+            Some(Err(error)) => Err(error.into()),
+            None => Err(Eof),
+        }
+    }
+
+    fn two_char_token(&mut self, tokens: Vec<(char, Tok)>, default: Tok) -> Result<Token> {
+        self.save_start();
+        self.advance()?;
+        let token =
+            match self.bytes_iter.peek() {
+                Some(&Ok(byte)) => {
+                    let mut token = None;
+                    let next_char = byte as char;
+                    for (ch, tok) in tokens {
+                        if ch == next_char {
+                            token = Some(tok);
+                        }
+                    }
+                    token
+                },
+                _ => None,
+            };
+        let token =
+            if let Some(token) = token {
+                self.advance()?;
+                token
+            }
+            else {
+                default
+            };
+        self.make_token(token)
     }
 }

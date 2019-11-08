@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2018-2019 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -21,63 +21,40 @@
 
 use std::fmt::{self, Display, Formatter};
 
-use position::Pos;
+use self::Label::{Named, Num};
 
-#[derive(Clone, Debug)]
-pub enum Tok {
-    Ampersand,
-    Array,
-    Break,
-    CloseCurly,
-    CloseParen,
-    CloseSquare,
-    Colon,
-    ColonEqual,
-    Comma,
-    Do,
-    Dot,
-    Else,
-    End,
-    Equal,
-    For,
-    Function,
-    Greater,
-    GreaterOrEqual,
-    Ident(String),
-    If,
-    In,
-    Int(i64),
-    Lesser,
-    LesserOrEqual,
-    Let,
-    Minus,
-    Nil,
-    NotEqual,
-    Of,
-    OpenCurly,
-    OpenParen,
-    OpenSquare,
-    Pipe,
-    Plus,
-    Semicolon,
-    Slash,
-    Star,
-    Str(String),
-    Then,
-    To,
-    Type,
-    Var,
-    While,
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Label {
+    Named(String),
+    Num(u32),
 }
 
-#[derive(Debug)]
-pub struct Token {
-    pub start: Pos,
-    pub token: Tok,
+impl Label {
+    pub fn new() -> Self {
+        static mut COUNTER: u32 = 0;
+        unsafe {
+            COUNTER += 1;
+            Num(COUNTER)
+        }
+    }
+
+    pub fn to_name(&self) -> String {
+        match *self {
+            Named(ref name) => name.clone(),
+            Num(_) => panic!("Expected Named"),
+        }
+    }
+
+    pub fn with_name(name: &str) -> Self {
+        Named(name.to_string())
+    }
 }
 
-impl Display for Tok {
+impl Display for Label {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "token")
+        match *self {
+            Named(ref name) => write!(formatter, "{}", name),
+            Num(num) => write!(formatter, "l{}", num),
+        }
     }
 }

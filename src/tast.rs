@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2019 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -19,161 +19,121 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use position::WithPos;
+use ast::{
+    FieldWithPos,
+    OperatorWithPos,
+    TypeDecWithPos,
+};
+use position::{Pos, WithPos};
 use symbol::{Symbol, SymbolWithPos};
+use types::Type;
 
 #[derive(Clone, Debug)]
 pub enum Declaration {
-    Function(Vec<FuncDeclarationWithPos>),
+    Function(Vec<TypedFuncDeclaration>),
     Type(Vec<TypeDecWithPos>),
     VariableDeclaration {
         escape: bool,
-        init: ExprWithPos,
+        init: TypedExpr,
         name: Symbol,
         typ: Option<SymbolWithPos>,
     },
 }
 
-pub type DeclarationWithPos = WithPos<Declaration>;
+pub type TypedDeclaration = WithPos<Declaration>;
 
 #[derive(Clone, Debug)]
 pub enum Expr {
     Array {
-        init: Box<ExprWithPos>,
-        size: Box<ExprWithPos>,
+        init: Box<TypedExpr>,
+        size: Box<TypedExpr>,
         typ: SymbolWithPos,
     },
     Assign {
-        expr: Box<ExprWithPos>,
-        var: VarWithPos,
+        expr: Box<TypedExpr>,
+        var: TypedVar,
     },
     Break,
     Call {
-        args: Vec<ExprWithPos>,
+        args: Vec<TypedExpr>,
         function: Symbol,
     },
     If {
-        else_: Option<Box<ExprWithPos>>,
-        test: Box<ExprWithPos>,
-        then: Box<ExprWithPos>,
+        else_: Option<Box<TypedExpr>>,
+        test: Box<TypedExpr>,
+        then: Box<TypedExpr>,
     },
     Int {
         value: i64,
     },
     Let {
-        body: Box<ExprWithPos>,
-        declarations: Vec<DeclarationWithPos>,
+        body: Box<TypedExpr>,
+        declarations: Vec<TypedDeclaration>,
     },
     Nil,
     Oper {
-        left: Box<ExprWithPos>,
+        left: Box<TypedExpr>,
         oper: OperatorWithPos,
-        right: Box<ExprWithPos>,
+        right: Box<TypedExpr>,
     },
     Record {
-        fields: Vec<RecordFieldWithPos>,
+        fields: Vec<TypedRecordField>,
         typ: SymbolWithPos,
     },
-    Sequence(Vec<ExprWithPos>),
+    Sequence(Vec<TypedExpr>),
     Str {
         value: String,
     },
-    Variable(VarWithPos),
+    Variable(TypedVar),
     While {
-        body: Box<ExprWithPos>,
-        test: Box<ExprWithPos>,
+        body: Box<TypedExpr>,
+        test: Box<TypedExpr>,
     },
 }
 
-pub type ExprWithPos = WithPos<Expr>;
-
 #[derive(Clone, Debug)]
-pub struct Field {
-    pub escape: bool,
-    pub name: Symbol,
-    pub typ: SymbolWithPos,
+pub struct TypedExpr {
+    pub expr: Expr,
+    pub pos: Pos,
+    pub typ: Type,
 }
-
-pub type FieldWithPos = WithPos<Field>;
 
 #[derive(Clone, Debug)]
 pub struct FuncDeclaration {
-    pub body: ExprWithPos,
+    pub body: TypedExpr,
     pub name: Symbol,
     pub params: Vec<FieldWithPos>,
     pub result: Option<SymbolWithPos>,
 }
 
-pub type FuncDeclarationWithPos = WithPos<FuncDeclaration>;
-
-#[derive(Clone, Copy, Debug)]
-pub enum Operator {
-    And,
-    Divide,
-    Equal,
-    Ge,
-    Gt,
-    Le,
-    Lt,
-    Minus,
-    Neq,
-    Or,
-    Plus,
-    Times,
-}
-
-pub type OperatorWithPos = WithPos<Operator>;
+pub type TypedFuncDeclaration = WithPos<FuncDeclaration>;
 
 #[derive(Clone, Debug)]
 pub struct RecordField {
-    pub expr: ExprWithPos,
+    pub expr: TypedExpr,
     pub ident: Symbol,
 }
 
-pub type RecordFieldWithPos = WithPos<RecordField>;
-
-#[derive(Clone, Debug)]
-pub enum Ty {
-    Array {
-        ident: SymbolWithPos,
-    },
-    Name {
-        ident: SymbolWithPos,
-    },
-    Record {
-        fields: Vec<FieldWithPos>,
-    },
-}
-
-#[derive(Clone, Debug)]
-pub struct TypeDec {
-    pub name: SymbolWithPos,
-    pub ty: TyWithPos,
-}
-
-pub type TypeDecWithPos = WithPos<TypeDec>;
-
-pub type TyWithPos = WithPos<Ty>;
+pub type TypedRecordField = WithPos<RecordField>;
 
 #[derive(Clone, Debug)]
 pub enum Var {
     Field {
         ident: SymbolWithPos,
-        this: Box<VarWithPos>,
+        this: Box<TypedVar>,
     },
     Simple {
         ident: SymbolWithPos,
     },
     Subscript {
-        expr: Box<ExprWithPos>,
-        this: Box<VarWithPos>,
+        expr: Box<TypedExpr>,
+        this: Box<TypedVar>,
     },
 }
 
-pub type VarWithPos = WithPos<Var>;
-
-pub fn dummy_var_expr(symbol: Symbol) -> ExprWithPos {
-    WithPos::dummy(Expr::Variable(WithPos::dummy(Var::Simple {
-        ident: WithPos::dummy(symbol),
-    })))
+#[derive(Clone, Debug)]
+pub struct TypedVar {
+    pub pos: Pos,
+    pub typ: Type,
+    pub var: Var,
 }
