@@ -1,11 +1,17 @@
-refinement type for memory and thread safety:
+= Refinement type for memory and thread safety
+
+== Thread Safety
 
 thread_spawn(value: T)
     ensure is_unique(T)
 
+== Inspirations
+
 Essayer le langage Whiley.
 
-For ensuring no dangling reference
+== Memory Safety
+
+=== No dangling reference
 
 let vector_get(&vector): &a
 
@@ -13,6 +19,23 @@ let vector_push(&vector, a)
     ensure is_unique(&vector)
 
 Can we generalize this to allow multiple mutable references on the vector?
+
+== User-friendlyness
+
+Permissions are an alias for a precondition.
+
+perm mut(type) = is_unique(type)
+
+let vec_push(&mut self, element: T) // mut is the permission defined earlier.
+
+Maybe we don't need permissions. It could only be types:
+
+&mut could be a generic type
+
+type &mut T = *T
+ensures is_unique(*T)
+
+== TODO
 
 For ensuring memory deallocation, have post-condition like:
 
@@ -35,12 +58,6 @@ Markers are probably better for that? Does the compiler need to know the concept
 
 Cannot return reference to local variable.
 Cannot move non-static reference to move function.
-
-Permissions are an alias for a precondition.
-
-perm mut(type) = is_unique(type)
-
-let vec_push(&mut self, element: T) // mut is the permission defined earlier.
 
 Markers are a way to say what a type is.
 
