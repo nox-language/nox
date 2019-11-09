@@ -35,7 +35,6 @@ use ast::{
     OperatorWithPos,
     RecordFieldWithPos,
     Ty,
-    TypeDec,
     TypeDecWithPos,
     TyWithPos,
     Var,
@@ -109,14 +108,14 @@ impl<'a> SemanticAnalyzer<'a> {
             pos,
         );
         let result = Some(WithPos::new(self.env.type_symbol("int"), pos));
-        let declaration = self.trans_dec(WithPos::new(Declaration::Function(vec![
+        let declaration = self.trans_dec(WithPos::new(Declaration::Function(
             WithPos::new(FuncDeclaration {
                 body,
                 name: main_symbol,
                 params: vec![],
                 result,
             }, pos)
-        ]), pos), None);
+        ), pos), None);
         if self.errors.is_empty() {
             Ok(declaration.expect("declaration")) // TODO: remove expect()?
         }
@@ -127,8 +126,7 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn actual_ty(&mut self, typ: &Type) -> Type {
         match *typ {
-            Type::Name(_, Some(ref typ)) => *typ.clone(),
-            Type::Name(ref symbol, None) => self.get_type(symbol, DontAddError),
+            Type::Name(_, ref typ) => *typ.clone(),
             ref typ => typ.clone(),
         }
     }
@@ -136,12 +134,7 @@ impl<'a> SemanticAnalyzer<'a> {
     fn actual_ty_var(&mut self, typ: &Type) -> Type {
         let typ =
             match *typ {
-                Type::Name(_, Some(ref typ)) => *typ.clone(),
-                Type::Name(ref symbol, None) =>
-                    match self.get_var(symbol) {
-                        Entry::Var { ref typ, .. } => typ.clone(),
-                        _ => panic!("type should be a variable, not a function"),
-                    },
+                Type::Name(_, ref typ) => *typ.clone(),
                 ref typ => typ.clone(),
             };
         typ
@@ -160,16 +153,16 @@ impl<'a> SemanticAnalyzer<'a> {
         }
     }
 
-    fn check_duplicate_types(&mut self, types: &[TypeDecWithPos]) {
+    fn check_duplicate_types(&mut self, typ: &TypeDecWithPos) {
         let mut names = HashSet::new();
-        for typ in types {
-            names.insert(typ.node.name.node);
-            if let Ty::Name { ref ident } = typ.node.ty.node {
-                if names.contains(&ident.node) {
-                    return self.add_error(Error::Cycle {
-                        pos: typ.node.ty.pos,
-                    }, ());
-                }
+        // TODO: what is this doing? Checking that the type name is different than the right-hand
+        // side?
+        names.insert(typ.node.name.node);
+        if let Ty::Name { ref ident } = typ.node.ty.node {
+            if names.contains(&ident.node) {
+                return self.add_error(Error::Cycle {
+                    pos: typ.node.ty.pos,
+                }, ());
             }
         }
     }
@@ -222,92 +215,87 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn trans_dec(&mut self, declaration: DeclarationWithPos, done_label: Option<Label>) -> Option<TypedDeclaration> {
         match declaration.node {
-            Declaration::Function(declarations) => {
-                println!("Len: {}", declarations.len());
-                let mut llvm_functions = vec![];
-                for WithPos { node: function, .. } in &declarations {
-                    let result_type =
-                        if let Some(ref result) = function.result {
-                            self.get_type(result, AddError)
-                        }
-                        else {
-                            Type::Unit
-                        };
-                    // TODO: error when name already exist?
-                    let mut param_names = vec![];
-                    let mut parameters = vec![];
-                    let mut param_set = HashSet::new();
-                    for param in &function.params {
-                        parameters.push(self.get_type(&param.node.typ, AddError));
-                        param_names.push(param.node.name);
-                        if !param_set.insert(param.node.name) {
-                            self.duplicate_param(&param);
-                        }
+            Declaration::Function(declaration) => {
+                let function = declaration.node;
+                let result_type =
+                    if let Some(ref result) = function.result {
+                        self.get_type(result, AddError)
                     }
-                    let func_name = self.strings.get(function.name).expect("strings get");
-                    let llvm_function = gen::function(&self.module, &function, &self.strings);
-                    self.env.enter_var(function.name, Entry::Fun {
-                        label: Label::with_name(&func_name),
-                        llvm_function: llvm_function.clone(),
-                        parameters,
-                        result: result_type.clone(),
-                    });
-                    llvm_functions.push(llvm_function);
+                    else {
+                        Type::Unit
+                    };
+                // TODO: error when name already exist?
+                let mut param_names = vec![];
+                let mut parameters = vec![];
+                let mut param_set = HashSet::new();
+                for param in &function.params {
+                    parameters.push(self.get_type(&param.node.typ, AddError));
+                    param_names.push(param.node.name);
+                    if !param_set.insert(param.node.name) {
+                        self.duplicate_param(&param);
+                    }
                 }
-                println!("LLVM len: {}", llvm_functions.len());
+                let func_name = self.strings.get(function.name).expect("strings get");
 
-                let declarations = declarations.into_iter().zip(llvm_functions).map(|(WithPos { node: function, pos }, llvm_function)| {
-                    let result_type =
-                        if let Some(ref result) = function.result {
-                            self.get_type(result, DontAddError)
-                        }
-                        else {
-                            Type::Unit
-                        };
-                    let mut param_names = vec![];
-                    let mut parameters = vec![];
-                    let mut new_params = vec![];
-                    for param in &function.params {
-                        parameters.push(self.get_type(&param.node.typ, DontAddError));
-                        param_names.push(param.node.name);
-
-                        new_params.push(WithPos::new(tast::Field {
-                            escape: param.node.escape,
-                            name: param.node.name,
-                            typ: param.node.typ.clone(),
-                            value: gen::create_entry_block_alloca(&llvm_function, &self.symbol(param.node.name)),
-                        }, param.pos));
+                let result_type =
+                    if let Some(ref result) = function.result {
+                        self.get_type(result, DontAddError)
                     }
-                    self.env.begin_scope();
-                    for (param, name) in parameters.into_iter().zip(param_names) {
-                        self.env.enter_var(name, Entry::Var { typ: param, value: None });
-                    }
-                    let exp = self.trans_exp(function.body, done_label.clone());
-                    self.check_types(&result_type, &exp.typ, exp.pos);
-                    self.env.end_scope();
-                    WithPos::new(tast::FuncDeclaration {
-                        body: exp,
-                        llvm_function,
-                        name: function.name,
-                        params: new_params,
-                        result: function.result,
-                    }, pos)
-                }).collect();
+                    else {
+                        Type::Unit
+                    };
+                let mut param_names = vec![];
+                let mut parameters = vec![];
+                for param in &function.params {
+                    let typ = self.get_type(&param.node.typ, DontAddError);
+                    parameters.push(typ.clone());
+                    param_names.push(param.node.name);
+                }
 
-                Some(WithPos::new(tast::Declaration::Function(declarations), declaration.pos))
+                let llvm_function = gen::function(&self.module, &result_type, &parameters, function.name, &self.strings);
+
+                let mut new_params = vec![];
+                for (param, typ) in function.params.iter().zip(&parameters) {
+                    new_params.push(WithPos::new(tast::Field {
+                        escape: param.node.escape,
+                        name: param.node.name,
+                        typ: typ.clone(),
+                        value: gen::create_entry_block_alloca(&llvm_function, &self.symbol(param.node.name), &typ),
+                    }, param.pos));
+                }
+
+                self.env.enter_var(function.name, Entry::Fun {
+                    label: Label::with_name(&func_name),
+                    llvm_function: llvm_function.clone(),
+                    parameters: parameters.clone(),
+                    result: result_type.clone(),
+                });
+
+                self.env.begin_scope();
+                for (param, name) in parameters.into_iter().zip(param_names) {
+                    self.env.enter_var(name, Entry::Var { typ: param, value: None });
+                }
+                let exp = self.trans_exp(function.body, done_label.clone());
+                self.check_types(&result_type, &exp.typ, exp.pos);
+                self.env.end_scope();
+                let pos = declaration.pos;
+                let declaration = WithPos::new(tast::FuncDeclaration {
+                    body: exp,
+                    llvm_function,
+                    name: function.name,
+                    params: new_params,
+                    result_type,
+                }, pos);
+
+                Some(WithPos::new(tast::Declaration::Function(declaration), pos))
             },
-            Declaration::Type(type_declarations) => {
-                self.check_duplicate_types(&type_declarations);
-                for &WithPos { node: TypeDec { ref name, .. }, .. } in &type_declarations {
-                    self.env.enter_type(name.node, Type::Name(name.clone(), None));
-                }
+            Declaration::Type(type_declaration) => {
+                self.check_duplicate_types(&type_declaration);
+                let name = &type_declaration.node.name;
+                let new_type = self.trans_ty(name.node, &type_declaration.node.ty);
+                self.env.enter_type(name.node, Type::Name(name.clone(), Box::new(new_type)));
 
-                for &WithPos { node: TypeDec { ref name, ref ty }, .. } in &type_declarations {
-                    let new_type = self.trans_ty(name.node, ty);
-                    self.env.replace_type(name.node, new_type);
-                }
-
-                Some(WithPos::new(tast::Declaration::Type(type_declarations), declaration.pos))
+                Some(WithPos::new(tast::Declaration::Type(type_declaration), declaration.pos))
             },
             Declaration::VariableDeclaration { escape, init, name, typ, .. } => {
                 let init = self.trans_exp(init, done_label);
@@ -424,25 +412,17 @@ impl<'a> SemanticAnalyzer<'a> {
                     pos: expr.pos,
                     typ: Type::Int,
                 },
-            Expr::Let { body, declarations } => {
+            Expr::Let(declaration) => {
                 let old_in_loop = self.in_loop;
                 self.in_loop = false;
                 self.env.begin_scope();
-                let declarations = declarations.into_iter().filter_map(|declaration|
-                        self.trans_dec(declaration, done_label.clone())
-                    )
-                    .collect();
+                let declaration = self.trans_dec(*declaration, done_label.clone());
                 self.in_loop = old_in_loop;
-                let result = Box::new(self.trans_exp(*body, done_label));
-                let typ = result.typ.clone();
                 self.env.end_scope();
                 TypedExpr {
-                    expr: tast::Expr::Let {
-                        body: result,
-                        declarations,
-                    },
+                    expr: tast::Expr::Let(Box::new(declaration.expect("declaration"))), // TODO: handle error.
                     pos: expr.pos,
-                    typ,
+                    typ: Type::Unit,
                 }
             },
             Expr::Nil =>

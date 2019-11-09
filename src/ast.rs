@@ -24,8 +24,8 @@ use symbol::{Symbol, SymbolWithPos};
 
 #[derive(Clone, Debug)]
 pub enum Declaration {
-    Function(Vec<FuncDeclarationWithPos>),
-    Type(Vec<TypeDecWithPos>),
+    Function(FuncDeclarationWithPos),
+    Type(TypeDecWithPos),
     VariableDeclaration {
         escape: bool,
         init: ExprWithPos,
@@ -60,10 +60,7 @@ pub enum Expr {
     Int {
         value: i64,
     },
-    Let {
-        body: Box<ExprWithPos>,
-        declarations: Vec<DeclarationWithPos>,
-    },
+    Let(Box<DeclarationWithPos>),
     Nil,
     Oper {
         left: Box<ExprWithPos>,

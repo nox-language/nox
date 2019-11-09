@@ -41,7 +41,7 @@ use rlvm::{
     value::constant,
 };
 
-use ast::{self, Operator};
+use ast::Operator;
 use symbol::{Strings, Symbol};
 use tast::{
     Declaration,
@@ -50,6 +50,7 @@ use tast::{
     TypedDeclaration,
 };
 use temp::Label;
+use types::Type;
 
 pub fn alloc_local() -> Value {
     unimplemented!();
@@ -147,17 +148,33 @@ pub struct Gen {
     target_machine: TargetMachine,
 }
 
-pub fn create_entry_block_alloca(function: &Function, variable_name: &str) -> Value {
+fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
+    match *typ {
+        Type::Int => types::integer::int32(), // TODO: int64?
+        Type::String => types::pointer::new(types::int8(), 0),
+        Type::Record(_symbol, ref _fields, _) => unimplemented!(),
+        Type::Array(ref _type, _) => unimplemented!(),
+        Type::Nil => types::integer::int32(), // TODO: int64 or pointer type?
+        Type::Unit => types::void(),
+        Type::Name(ref _symbol, ref _type) => unimplemented!(),
+        Type::Error => unreachable!("error to llvm type"),
+    }
+}
+
+pub fn create_entry_block_alloca(function: &Function, variable_name: &str, typ: &Type) -> Value {
     let basic_block = function.get_entry_basic_block();
     let instruction = basic_block.get_first_instruction();
     let builder = Builder::new();
     builder.position(&basic_block, &instruction);
-    builder.alloca(types::double(), variable_name) // TODO: use the right type.
+    builder.alloca(to_llvm_type(typ), variable_name)
 }
 
-pub fn function(module: &Module, function: &ast::FuncDeclaration, strings: &Rc<Strings>) -> Function {
-    let function_type = types::function::new(types::int32(), &[types::pointer::new(types::int8(), 0)], false); // TODO: assign right type.
-    module.add_function(&strings.get(function.name).expect("symbol"), function_type)
+pub fn function(module: &Module, result_type: &Type, params: &[Type], name: Symbol, strings: &Rc<Strings>) -> Function {
+    let param_types: Vec<_> = params.iter()
+        .map(|typ| to_llvm_type(&typ))
+        .collect();
+    let function_type = types::function::new(to_llvm_type(&result_type), &param_types, false);
+    module.add_function(&strings.get(name).expect("symbol"), function_type)
 }
 
 impl Gen {
@@ -195,11 +212,7 @@ impl Gen {
 
     fn declaration(&mut self, declaration: &TypedDeclaration) {
         match declaration.node {
-            Declaration::Function(ref functions) => {
-                for function in functions {
-                    self.function_declaration(&function.node);
-                }
-            },
+            Declaration::Function(ref function) => self.function_declaration(&function.node),
             _ => unimplemented!(),
         }
     }
@@ -239,7 +252,6 @@ impl Gen {
 
         self.pass_manager.run(&function.llvm_function);
 
-        println!("Dump");
         self.module.dump();
     }
 
@@ -249,6 +261,7 @@ impl Gen {
 
         self.declaration(declaration);
         if let Err(error) = self.target_machine.emit_to_file(&self.module, object_output_path.as_os_str().to_str().expect("filename"), CodeGenFileType::ObjectFile) {
+            // TODO: return error instead?
             eprintln!("Cannot emit to object: {}", error);
         }
 

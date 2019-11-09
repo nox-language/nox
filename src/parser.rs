@@ -201,7 +201,11 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn dec(&mut self) -> Result<DeclarationWithPos> {
         match self.peek()?.token {
-            Function => self.fun_decs(),
+            Function => {
+                let function = self.fun_dec()?;
+                let pos = function.pos;
+                Ok(WithPos::new(Declaration::Function(function), pos))
+            },
             Type => self.ty_decs(),
             Var => self.var_dec(),
             _ => Err(self.unexpected_token("function, type or var")?),
@@ -276,20 +280,6 @@ impl<'a, R: Read> Parser<'a, R> {
         // Convert for loop into while loop.
         let start_symbol = self.symbols.symbol(&var_name);
         let end_symbol = self.symbols.symbol(&format!("__{}_limit", var_name));
-        let declarations = vec![
-            WithPos::dummy(VariableDeclaration {
-                escape: false,
-                init: start,
-                name: start_symbol,
-                typ: None,
-            }),
-            WithPos::dummy(VariableDeclaration {
-                escape: false,
-                init: end,
-                name: end_symbol,
-                typ: None,
-            }),
-        ];
         let body =
             Expr::If {
                 else_: None,
@@ -329,20 +319,27 @@ impl<'a, R: Read> Parser<'a, R> {
                     })),
             };
 
-        Ok(WithPos::new(Expr::Let {
-            body: Box::new(WithPos::dummy(body)),
-            declarations,
-        }, pos))
-    }
+        let declarations = Expr::Sequence(vec![
+            WithPos::dummy(Expr::Let(
+                Box::new(WithPos::dummy(VariableDeclaration {
+                    escape: false,
+                    init: start,
+                    name: start_symbol,
+                    typ: None,
+                }))
+            )),
+            WithPos::dummy(Expr::Let(
+                Box::new(WithPos::dummy(VariableDeclaration {
+                    escape: false,
+                    init: end,
+                    name: end_symbol,
+                    typ: None,
+                }))
+            )),
+            WithPos::dummy(body)
+        ]);
 
-    fn fun_decs(&mut self) -> Result<DeclarationWithPos> {
-        let func = self.fun_dec()?;
-        let pos = func.pos;
-        let mut functions = vec![func];
-        while let Function = self.peek()?.token {
-            functions.push(self.fun_dec()?);
-        }
-        Ok(WithPos::new(Declaration::Function(functions), pos))
+        Ok(WithPos::new(declarations, pos))
     }
 
     fn fun_dec(&mut self) -> Result<FuncDeclarationWithPos> {
@@ -394,26 +391,8 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn let_expr(&mut self) -> Result<ExprWithPos> {
         let pos = eat!(self, Let);
-        let mut declarations = vec![self.dec()?];
-        loop {
-            match self.peek()?.token {
-                Function | Type | Var => declarations.push(self.dec()?),
-                _ => break,
-            }
-        }
-        eat!(self, In, "function, in, type, var".to_string());
-        let expr = self.expr()?;
-        let mut exprs = vec![expr];
-        while let Semicolon = self.peek()?.token {
-            eat!(self, Semicolon);
-            exprs.push(self.expr()?);
-        }
-        eat!(self, End);
-        let body_pos = exprs[0].pos;
-        Ok(WithPos::new(Expr::Let {
-            body: Box::new(WithPos::new(Expr::Sequence(exprs), body_pos)),
-            declarations,
-        }, pos))
+        let declaration = self.dec()?;
+        Ok(WithPos::new(Expr::Let(Box::new(declaration)), pos))
     }
 
     fn logical_and_expr(&mut self) -> Result<ExprWithPos> {
@@ -647,11 +626,7 @@ impl<'a, R: Read> Parser<'a, R> {
     fn ty_decs(&mut self) -> Result<DeclarationWithPos> {
         let dec = self.ty_dec()?;
         let pos = dec.pos;
-        let mut declarations = vec![dec];
-        while let Type = self.peek()?.token {
-            declarations.push(self.ty_dec()?);
-        }
-        Ok(WithPos::new(Declaration::Type(declarations), pos))
+        Ok(WithPos::new(Declaration::Type(dec), pos))
     }
 
     fn ty_dec(&mut self) -> Result<TypeDecWithPos> {

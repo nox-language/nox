@@ -31,8 +31,8 @@ use types::Type;
 
 #[derive(Clone, Debug)]
 pub enum Declaration {
-    Function(Vec<TypedFuncDeclaration>),
-    Type(Vec<TypeDecWithPos>),
+    Function(TypedFuncDeclaration),
+    Type(TypeDecWithPos),
     VariableDeclaration {
         escape: bool,
         init: TypedExpr,
@@ -67,10 +67,7 @@ pub enum Expr {
     Int {
         value: i64,
     },
-    Let {
-        body: Box<TypedExpr>,
-        declarations: Vec<TypedDeclaration>,
-    },
+    Let(Box<TypedDeclaration>),
     Nil,
     Oper {
         left: Box<TypedExpr>,
@@ -103,7 +100,7 @@ pub struct TypedExpr {
 pub struct Field {
     pub escape: bool,
     pub name: Symbol,
-    pub typ: SymbolWithPos,
+    pub typ: Type,
     pub value: Value,
 }
 
@@ -115,7 +112,7 @@ pub struct FuncDeclaration {
     pub llvm_function: Function,
     pub name: Symbol,
     pub params: Vec<FieldWithPos>,
-    pub result: Option<SymbolWithPos>,
+    pub result_type: Type,
 }
 
 pub type TypedFuncDeclaration = WithPos<FuncDeclaration>;

@@ -5,6 +5,8 @@
 thread_spawn(value: T)
     ensure is_unique(T)
 
+give lifetime to thread (to share references between threads)?
+
 == Inspirations
 
 Essayer le langage Whiley.

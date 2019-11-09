@@ -32,7 +32,7 @@ pub enum Type {
     Array(Box<Type>, Unique),
     Nil,
     Unit,
-    Name(SymbolWithPos, Option<Box<Type>>),
+    Name(SymbolWithPos, Box<Type>),
     Error,
 }
 
@@ -61,12 +61,7 @@ impl Display for Type {
                 Nil => "nil".to_string(),
                 Unit => "()".to_string(),
                 Name(_, ref typ) => {
-                    if let Some(ref typ) = *typ {
-                        typ.fmt(formatter)?;
-                    }
-                    else {
-                        write!(formatter, "unresolved type")?;
-                    }
+                    typ.fmt(formatter)?;
                     return Ok(());
                 },
                 Error => "type error".to_string(),
