@@ -492,26 +492,15 @@ impl<'a> SemanticAnalyzer<'a> {
                     typ: ty,
                 }
             },
-            Expr::Sequence(mut exprs) => {
-                if let Some(last_expr) = exprs.pop() {
-                    let mut new_exprs = vec![];
-                    for expr in exprs {
-                        new_exprs.push(self.trans_exp(expr, done_label.clone()));
-                    }
-                    let last_expr = self.trans_exp(last_expr, done_label);
-                    if new_exprs.is_empty() {
-                        last_expr
-                    }
-                    else {
-                        TypedExpr {
-                            expr: tast::Expr::Sequence(new_exprs),
-                            pos: expr.pos,
-                            typ: last_expr.typ,
-                        }
-                    }
-                }
-                else {
-                    panic!("Unexpected empty sequence.");
+            Expr::Sequence(exprs) => {
+                let new_exprs: Vec<_> = exprs.into_iter()
+                    .map(|expr| self.trans_exp(expr, done_label.clone()))
+                    .collect();
+                let typ = new_exprs.last().cloned().expect("Unexpected empty sequence").typ;
+                TypedExpr {
+                    expr: tast::Expr::Sequence(new_exprs),
+                    pos: expr.pos,
+                    typ,
                 }
             },
             Expr::Str { ref value } =>

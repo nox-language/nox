@@ -148,7 +148,7 @@ pub struct Gen {
     target_machine: TargetMachine,
 }
 
-fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
+pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
     match *typ {
         Type::Int => types::integer::int32(), // TODO: int64?
         Type::String => types::pointer::new(types::int8(), 0),
@@ -222,7 +222,7 @@ impl Gen {
             match *expr {
                 Expr::Call { ref args, ref llvm_function } => {
                     let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(&arg.expr)).collect();
-                    self.builder.call(llvm_function.clone(), &arguments, "func_call")
+                    self.builder.call(llvm_function.clone(), &arguments, "")
                 },
                 Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
                 Expr::Sequence(ref exprs) => {
@@ -248,6 +248,7 @@ impl Gen {
         let return_value = self.expr(&function.body.expr);
 
         self.builder.ret(return_value);
+        function.llvm_function.dump();
         function.llvm_function.verify(VerifierFailureAction::AbortProcess);
 
         self.pass_manager.run(&function.llvm_function);

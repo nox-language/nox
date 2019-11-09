@@ -29,6 +29,7 @@ use rlvm::{
     types,
 };
 
+use gen;
 use symbol::{Strings, Symbol, Symbols};
 use temp::Label;
 use types::Type;
@@ -76,7 +77,11 @@ impl Env {
 
     fn add_function(&mut self, name: &str, parameters: Vec<Type>, result: Type, module: &Module) {
         let symbol = self.var_env.symbol(name);
-        let function_type = types::function::new(types::int32(), &[types::pointer::new(types::int8(), 0)], false); // TODO: assign right type.
+        let result_type = gen::to_llvm_type(&result);
+        let param_types: Vec<_> = parameters.iter()
+            .map(|typ| gen::to_llvm_type(&typ))
+            .collect();
+        let function_type = types::function::new(result_type, &param_types, false);
         let llvm_function = module.add_function(name, function_type);
         let entry = Entry::Fun {
             label: Label::with_name(name),
