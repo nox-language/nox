@@ -19,8 +19,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use rlvm::{Value, module::Function};
+
 use ast::{
-    FieldWithPos,
     OperatorWithPos,
     TypeDecWithPos,
 };
@@ -56,7 +57,7 @@ pub enum Expr {
     Break,
     Call {
         args: Vec<TypedExpr>,
-        function: Symbol,
+        llvm_function: Function,
     },
     If {
         else_: Option<Box<TypedExpr>>,
@@ -99,8 +100,19 @@ pub struct TypedExpr {
 }
 
 #[derive(Clone, Debug)]
+pub struct Field {
+    pub escape: bool,
+    pub name: Symbol,
+    pub typ: SymbolWithPos,
+    pub value: Value,
+}
+
+pub type FieldWithPos = WithPos<Field>;
+
+#[derive(Clone, Debug)]
 pub struct FuncDeclaration {
     pub body: TypedExpr,
+    pub llvm_function: Function,
     pub name: Symbol,
     pub params: Vec<FieldWithPos>,
     pub result: Option<SymbolWithPos>,

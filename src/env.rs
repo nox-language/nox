@@ -22,10 +22,13 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use rlvm::Value;
-use rlvm::module::Function;
+use rlvm::{
+    Module,
+    Value,
+    module::Function,
+    types,
+};
 
-use gen::Gen;
 use symbol::{Strings, Symbol, Symbols};
 use temp::Label;
 use types::Type;
@@ -40,7 +43,7 @@ pub enum Entry {
     },
     Var {
         typ: Type,
-        value: Value,
+        value: Option<Value>,
     },
     Error,
 }
@@ -51,7 +54,7 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn new(strings: &Rc<Strings>, gen: &Gen) -> Self {
+    pub fn new(strings: &Rc<Strings>, module: &Module) -> Self {
         let mut type_env = Symbols::new(Rc::clone(strings));
         let int_symbol = type_env.symbol("int");
         type_env.enter(int_symbol, Type::Int);
@@ -65,18 +68,19 @@ impl Env {
         };
 
         for (name, (param_types, return_type)) in external_functions() {
-            env.add_function(name, param_types, return_type, gen);
+            env.add_function(name, param_types, return_type, module);
         }
 
         env
     }
 
-    fn add_function(&mut self, name: &str, parameters: Vec<Type>, result: Type, gen: &Gen) {
+    fn add_function(&mut self, name: &str, parameters: Vec<Type>, result: Type, module: &Module) {
         let symbol = self.var_env.symbol(name);
+        let function_type = types::function::new(types::int32(), &[types::pointer::new(types::int8(), 0)], false); // TODO: assign right type.
+        let llvm_function = module.add_function(name, function_type);
         let entry = Entry::Fun {
-            external: true,
             label: Label::with_name(name),
-            llvm_function: gen.function_declaration(name, &parameters),
+            llvm_function,
             parameters,
             result,
         };
@@ -107,6 +111,10 @@ impl Env {
 
     pub fn look_var(&self, symbol: Symbol) -> Option<&Entry> {
         self.var_env.look(symbol)
+    }
+
+    pub fn look_var_mut(&mut self, symbol: Symbol) -> Option<&mut Entry> {
+        self.var_env.look_mut(symbol)
     }
 
     pub fn replace_type(&mut self, symbol: Symbol, typ: Type) {

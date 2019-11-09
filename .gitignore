@@ -1,4 +1,7 @@
 /target
 **/*.rs.bk
-main
-main.o
+tests/*
+!tests/**/
+!tests/*.*
+tests/*.o
+tests/*.s

@@ -19,24 +19,37 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use std::path::PathBuf;
+use std::rc::Rc;
+
 use rlvm::{
     Builder,
+    CodeGenFileType,
     CodeGenOptLevel,
     CodeModel,
+    FunctionPassManager,
     Module,
     RealPredicate,
     RelocMode,
     Target,
     Value,
+    VerifierFailureAction,
     get_default_target_triple,
     module::Function,
+    target::TargetMachine,
     types,
     value::constant,
 };
 
-use ast::{FieldWithPos, Operator};
+use ast::{self, Operator};
+use symbol::{Strings, Symbol};
+use tast::{
+    Declaration,
+    Expr,
+    FuncDeclaration,
+    TypedDeclaration,
+};
 use temp::Label;
-use types::Type;
 
 pub fn alloc_local() -> Value {
     unimplemented!();
@@ -129,30 +142,120 @@ fn to_real_rel_op(op: Operator) -> RealPredicate {
 pub struct Gen {
     builder: Builder,
     module: Module,
+    pass_manager: FunctionPassManager,
+    strings: Rc<Strings>,
+    target_machine: TargetMachine,
+}
+
+pub fn create_entry_block_alloca(function: &Function, variable_name: &str) -> Value {
+    let basic_block = function.get_entry_basic_block();
+    let instruction = basic_block.get_first_instruction();
+    let builder = Builder::new();
+    builder.position(&basic_block, &instruction);
+    builder.alloca(types::double(), variable_name) // TODO: use the right type.
+}
+
+pub fn function(module: &Module, function: &ast::FuncDeclaration, strings: &Rc<Strings>) -> Function {
+    let function_type = types::function::new(types::int32(), &[types::pointer::new(types::int8(), 0)], false); // TODO: assign right type.
+    module.add_function(&strings.get(function.name).expect("symbol"), function_type)
 }
 
 impl Gen {
-    pub fn new() -> Self {
+    pub fn new(strings: Rc<Strings>, module: Module) -> Self {
         let target_triple = get_default_target_triple();
         let target = Target::get_from_triple(&target_triple).expect("get target");
 
         let target_machine = target.create_target_machine(&target_triple, "generic", "", CodeGenOptLevel::Aggressive, RelocMode::Default, CodeModel::Default);
 
-        let module = Module::new_with_name("module");
         module.set_data_layout(target_machine.create_data_layout());
         module.set_target(target_triple);
+
+        let pass_manager = FunctionPassManager::new_for_module(&module);
+        pass_manager.add_promote_memory_to_register_pass();
+        pass_manager.add_instruction_combining_pass();
+        pass_manager.add_reassociate_pass();
+        pass_manager.add_gvn_pass();
+        pass_manager.add_cfg_simplification_pass();
+
         Self {
             builder: Builder::new(),
             module,
+            pass_manager,
+            strings,
+            target_machine,
         }
     }
 
-    pub fn function_declaration(&self, func_name: &str, parameters: &[Type]) -> Function {
-        let function_type = types::function::new(types::int32(), &[types::pointer::new(types::int8(), 0)], false);
-        self.module.add_function(func_name, function_type)
+    fn create_argument_allocas(&mut self, llvm_function: &Function, function: &FuncDeclaration) {
+        for (index, field) in function.params.iter().enumerate() {
+            let arg = llvm_function.get_param(index);
+            self.builder.store(&arg, &field.node.value);
+        }
     }
 
-    pub fn string_literal(&mut self, string: String) -> Value {
-        self.builder.global_string_ptr(&string, "string")
+    fn declaration(&mut self, declaration: &TypedDeclaration) {
+        match declaration.node {
+            Declaration::Function(ref functions) => {
+                for function in functions {
+                    self.function_declaration(&function.node);
+                }
+            },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn expr(&self, expr: &Expr) -> Value {
+        let value =
+            match *expr {
+                Expr::Call { ref args, ref llvm_function } => {
+                    let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(&arg.expr)).collect();
+                    self.builder.call(llvm_function.clone(), &arguments, "func_call")
+                },
+                Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
+                Expr::Sequence(ref exprs) => {
+                    let (last_expr, exprs) = exprs.split_last().expect("at least one expression in sequence");
+                    for expr in exprs {
+                        self.expr(&expr.expr);
+                    }
+                    self.expr(&last_expr.expr)
+                },
+                Expr::Str { ref value } => {
+                    self.builder.global_string_ptr(value, "string")
+                },
+                _ => unimplemented!("{:?}", expr),
+            };
+        value
+    }
+
+    fn function_declaration(&mut self, function: &FuncDeclaration) {
+        let entry = function.llvm_function.append_basic_block("entry");
+        self.builder.position_at_end(&entry);
+        self.create_argument_allocas(&function.llvm_function, &function);
+
+        let return_value = self.expr(&function.body.expr);
+
+        self.builder.ret(return_value);
+        function.llvm_function.verify(VerifierFailureAction::AbortProcess);
+
+        self.pass_manager.run(&function.llvm_function);
+
+        println!("Dump");
+        self.module.dump();
+    }
+
+    pub fn generate(&mut self, declaration: &TypedDeclaration, filename: &str) -> PathBuf {
+        let mut object_output_path = PathBuf::from(filename);
+        object_output_path.set_extension("o");
+
+        self.declaration(declaration);
+        if let Err(error) = self.target_machine.emit_to_file(&self.module, object_output_path.as_os_str().to_str().expect("filename"), CodeGenFileType::ObjectFile) {
+            eprintln!("Cannot emit to object: {}", error);
+        }
+
+        object_output_path
+    }
+
+    fn symbol(&self, symbol: Symbol) -> String {
+        self.strings.get(symbol).expect("symbol")
     }
 }

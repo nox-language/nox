@@ -6,4 +6,8 @@ authors = ["Antoni Boucher <bouanto@zoho.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rlvm = { path = "/home/antoni/Ordinateur/OpenSource/rlvm" } # "0.0.2"
+rlvm = { git = "ssh://git@framagit.org:/antoyo/rlvm.git" } # "0.0.2"
+
+[lib]
+name = "runtime"
+crate-type = ["staticlib"]

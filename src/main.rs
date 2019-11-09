@@ -19,6 +19,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/*
+ * TODO: call exit in main.
+ */
+
 #![allow(unknown_lints)]
 #![feature(box_patterns)]
 
@@ -46,6 +50,7 @@ use std::process::Command;
 use std::rc::Rc;
 
 use rlvm::{
+    Module,
     initialize_all_target_infos,
     initialize_all_targets,
     initialize_all_target_mcs,
@@ -89,16 +94,16 @@ fn drive() -> Result<(), Error> {
         let main_symbol = symbols.symbol("main");
         let mut parser = Parser::new(lexer, &mut symbols);
         let ast = parser.parse()?;
-        let gen = Gen::new();
-        let mut env = Env::new(&strings, &gen);
+        let module = Module::new_with_name("module");
+        let mut env = Env::new(&strings, &module);
         {
-            let semantic_analyzer = SemanticAnalyzer::new(&mut env, gen, Rc::clone(&strings));
-            semantic_analyzer.analyze(main_symbol, ast)?;
+            let semantic_analyzer = SemanticAnalyzer::new(&mut env, Rc::clone(&strings), &module);
+            let declaration = semantic_analyzer.analyze(main_symbol, ast)?;
+            env.end_scope(); // TODO: move after the semantic analysis?
 
-            unimplemented!("Generate object file from LLVM");
+            let mut gen = Gen::new(strings, module);
+            let object_output_path = gen.generate(&declaration, &filename);
 
-            let mut object_output_path = PathBuf::from(&filename);
-            object_output_path.set_extension("o");
             let mut executable_output_path = PathBuf::from(&filename);
             executable_output_path.set_extension("");
             Command::new("ld")
@@ -114,7 +119,6 @@ fn drive() -> Result<(), Error> {
                 .status()
                 .expect("link");
         }
-        env.end_scope(); // TODO: move after the semantic analysis?
     }
     Ok(())
 }
