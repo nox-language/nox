@@ -414,11 +414,10 @@ impl<'a> SemanticAnalyzer<'a> {
                 },
             Expr::Let(declaration) => {
                 let old_in_loop = self.in_loop;
+                // TODO: why set in_loop to false here?
                 self.in_loop = false;
-                self.env.begin_scope();
                 let declaration = self.trans_dec(*declaration, done_label.clone());
                 self.in_loop = old_in_loop;
-                self.env.end_scope();
                 TypedExpr {
                     expr: tast::Expr::Let(Box::new(declaration.expect("declaration"))), // TODO: handle error.
                     pos: expr.pos,
@@ -493,9 +492,11 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Expr::Sequence(exprs) => {
+                self.env.begin_scope();
                 let new_exprs: Vec<_> = exprs.into_iter()
                     .map(|expr| self.trans_exp(expr, done_label.clone()))
                     .collect();
+                self.env.end_scope();
                 let typ = new_exprs.last().cloned().expect("Unexpected empty sequence").typ;
                 TypedExpr {
                     expr: tast::Expr::Sequence(new_exprs),

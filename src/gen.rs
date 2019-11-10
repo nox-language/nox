@@ -248,7 +248,6 @@ impl Gen {
         let return_value = self.expr(&function.body.expr);
 
         self.builder.ret(return_value);
-        function.llvm_function.dump();
         function.llvm_function.verify(VerifierFailureAction::AbortProcess);
 
         self.pass_manager.run(&function.llvm_function);

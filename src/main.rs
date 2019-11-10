@@ -20,7 +20,7 @@
  */
 
 /*
- * TODO: call exit in main.
+ * TODO: call exit in main (that requires writing an alternative runtime).
  */
 
 #![allow(unknown_lints)]
