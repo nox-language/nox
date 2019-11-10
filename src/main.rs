@@ -101,8 +101,8 @@ fn drive() -> Result<(), Error> {
             let declaration = semantic_analyzer.analyze(main_symbol, ast)?;
             env.end_scope(); // TODO: move after the semantic analysis?
 
-            let mut gen = Gen::new(strings, module);
-            let object_output_path = gen.generate(&declaration, &filename);
+            let mut gen = Gen::new(module);
+            let object_output_path = gen.generate(declaration, &filename);
 
             let mut executable_output_path = PathBuf::from(&filename);
             executable_output_path.set_extension("");

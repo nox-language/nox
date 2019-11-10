@@ -217,13 +217,6 @@ impl<'a> SemanticAnalyzer<'a> {
         match declaration.node {
             Declaration::Function(declaration) => {
                 let function = declaration.node;
-                let result_type =
-                    if let Some(ref result) = function.result {
-                        self.get_type(result, AddError)
-                    }
-                    else {
-                        Type::Unit
-                    };
                 // TODO: error when name already exist?
                 let mut param_names = vec![];
                 let mut parameters = vec![];
@@ -366,7 +359,7 @@ impl<'a> SemanticAnalyzer<'a> {
             Expr::Call { args, function } => {
                 if let Some(entry@Entry::Fun { .. }) = self.env.look_var(function).cloned() { // TODO: remove this clone.
                     return match entry {
-                        Entry::Fun { ref label, ref llvm_function, ref parameters, ref result, .. } => {
+                        Entry::Fun { ref llvm_function, ref parameters, ref result, .. } => {
                             let mut expr_args = vec![];
                             for (arg, param) in args.into_iter().zip(parameters) {
                                 let exp = self.trans_exp(arg, done_label.clone());
@@ -556,7 +549,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 let this = Box::new(self.trans_var(*this, done_label));
                 match this.typ {
                     Type::Record(record_type, ref fields, _) => {
-                        for (index, &(name, ref typ)) in fields.iter().enumerate() {
+                        for &(name, ref typ) in fields {
                             if name == ident.node {
                                 return TypedVar {
                                     pos: var.pos,

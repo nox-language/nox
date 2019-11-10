@@ -118,14 +118,6 @@ impl Env {
         self.var_env.look(symbol)
     }
 
-    pub fn look_var_mut(&mut self, symbol: Symbol) -> Option<&mut Entry> {
-        self.var_env.look_mut(symbol)
-    }
-
-    pub fn replace_type(&mut self, symbol: Symbol, typ: Type) {
-        self.type_env.replace(symbol, typ);
-    }
-
     pub fn type_name(&self, symbol: Symbol) -> String {
         self.type_env.name(symbol)
     }

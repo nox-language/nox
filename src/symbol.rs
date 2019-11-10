@@ -90,19 +90,8 @@ impl<T> Symbols<T> {
             .and_then(|vec| vec.last())
     }
 
-    pub fn look_mut(&mut self, symbol: Symbol) -> Option<&mut T> {
-        self.table.get_mut(&symbol)
-            .and_then(|vec| vec.last_mut())
-    }
-
     pub fn name(&self, symbol: Symbol) -> String {
         self.strings.strings.borrow()[&symbol].to_string()
-    }
-
-    pub fn replace(&mut self, symbol: Symbol, data: T) {
-        let bindings = self.table.entry(symbol).or_insert_with(Vec::new);
-        bindings.pop().expect("Call enter() before replace()");
-        bindings.push(data);
     }
 
     pub fn symbol(&mut self, string: &str) -> Symbol {

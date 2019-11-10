@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use std::mem;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -49,72 +50,7 @@ use tast::{
     FuncDeclaration,
     TypedDeclaration,
 };
-use temp::Label;
 use types::Type;
-
-pub fn alloc_local() -> Value {
-    unimplemented!();
-}
-
-pub fn array_subscript(var: Value, subscript: Value) -> Value {
-    unimplemented!();
-}
-
-pub fn binary_oper(op: Operator, left: Value, right: Value) -> Value {
-    unimplemented!();
-}
-
-pub fn error() -> Value {
-    unimplemented!();
-}
-
-pub fn field_access(var: Value, field_index: usize) -> Value {
-    unimplemented!();
-}
-
-pub fn function_call(label: &Label, mut args: Vec<Value>) -> Value {
-    unimplemented!();
-}
-
-pub fn goto(label: Label) -> Value {
-    unimplemented!();
-}
-
-pub fn if_expression(test_expr: Value, if_expr: Value, else_expr: Option<Value>) -> Value {
-    unimplemented!();
-}
-
-pub fn num(number: i64) -> Value {
-    unimplemented!();
-}
-
-pub fn record_create(fields: Vec<Value>) -> Value {
-    if fields.is_empty() {
-        return unit();
-    }
-    unimplemented!();
-}
-
-pub fn relational_oper(op: Operator, left: Value, right: Value) -> Value {
-    unimplemented!();
-}
-
-pub fn string_equality(oper: Operator, left: Value, right: Value) -> Value {
-    //let exp = external_call("stringEqual", &[left, right]);
-    unimplemented!();
-}
-
-pub fn unit() -> Value {
-    unimplemented!();
-}
-
-pub fn var_dec(variable: &Value, value: Value) {
-    unimplemented!();
-}
-
-pub fn while_loop(done_label: &Label, test_expr: Value, body: Value) -> Value {
-    unimplemented!();
-}
 
 fn to_real_op(op: Operator) -> RealPredicate {
     match op {
@@ -138,14 +74,6 @@ fn to_real_rel_op(op: Operator) -> RealPredicate {
         Operator::Neq => unimplemented!(),
         _ => panic!("{:?} is not a relational operator or is not used", op),
     }
-}
-
-pub struct Gen {
-    builder: Builder,
-    module: Module,
-    pass_manager: FunctionPassManager,
-    strings: Rc<Strings>,
-    target_machine: TargetMachine,
 }
 
 pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
@@ -177,8 +105,16 @@ pub fn function(module: &Module, result_type: &Type, params: &[Type], name: Symb
     module.add_function(&strings.get(name).expect("symbol"), function_type)
 }
 
+pub struct Gen {
+    builder: Builder,
+    inner_functions: Vec<FuncDeclaration>,
+    module: Module,
+    pass_manager: FunctionPassManager,
+    target_machine: TargetMachine,
+}
+
 impl Gen {
-    pub fn new(strings: Rc<Strings>, module: Module) -> Self {
+    pub fn new(module: Module) -> Self {
         let target_triple = get_default_target_triple();
         let target = Target::get_from_triple(&target_triple).expect("get target");
 
@@ -196,41 +132,53 @@ impl Gen {
 
         Self {
             builder: Builder::new(),
+            inner_functions: Vec::new(),
             module,
             pass_manager,
-            strings,
             target_machine,
         }
     }
 
-    fn create_argument_allocas(&mut self, llvm_function: &Function, function: &FuncDeclaration) {
+    fn create_argument_allocas(&self, llvm_function: &Function, function: &FuncDeclaration) {
         for (index, field) in function.params.iter().enumerate() {
             let arg = llvm_function.get_param(index);
             self.builder.store(&arg, &field.node.value);
         }
     }
 
-    fn declaration(&mut self, declaration: &TypedDeclaration) {
+    fn declaration(&mut self, declaration: TypedDeclaration, inner: bool) {
         match declaration.node {
-            Declaration::Function(ref function) => self.function_declaration(&function.node),
+            Declaration::Function(function) => {
+                if inner {
+                    self.inner_functions.push(function.node);
+                }
+                else {
+                    self.function_declaration(function.node);
+                }
+            },
             _ => unimplemented!(),
         }
     }
 
-    fn expr(&self, expr: &Expr) -> Value {
+    fn expr(&mut self, expr: Expr) -> Value {
         let value =
-            match *expr {
-                Expr::Call { ref args, ref llvm_function } => {
-                    let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(&arg.expr)).collect();
+            match expr {
+                Expr::Call { args, llvm_function } => {
+                    let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(arg.expr)).collect();
                     self.builder.call(llvm_function.clone(), &arguments, "")
                 },
                 Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
-                Expr::Sequence(ref exprs) => {
-                    let (last_expr, exprs) = exprs.split_last().expect("at least one expression in sequence");
+                Expr::Let(declaration) => {
+                    self.declaration(*declaration, true);
+                    self.expr(Expr::Nil)
+                },
+                Expr::Nil => constant::int(types::integer::int32(), 0, true), // TODO: use pointer type?
+                Expr::Sequence(mut exprs) => {
+                    let last_expr = exprs.pop().expect("at least one expression in sequence");
                     for expr in exprs {
-                        self.expr(&expr.expr);
+                        self.expr(expr.expr);
                     }
-                    self.expr(&last_expr.expr)
+                    self.expr(last_expr.expr)
                 },
                 Expr::Str { ref value } => {
                     self.builder.global_string_ptr(value, "string")
@@ -240,35 +188,42 @@ impl Gen {
         value
     }
 
-    fn function_declaration(&mut self, function: &FuncDeclaration) {
+    fn function_declaration(&mut self, function: FuncDeclaration) {
         let entry = function.llvm_function.append_basic_block("entry");
         self.builder.position_at_end(&entry);
         self.create_argument_allocas(&function.llvm_function, &function);
 
-        let return_value = self.expr(&function.body.expr);
+        let return_value = self.expr(function.body.expr);
 
-        self.builder.ret(return_value);
+        if function.body.typ == Type::Unit {
+            self.builder.ret_no_value();
+        }
+        else {
+            self.builder.ret(return_value);
+        }
         function.llvm_function.verify(VerifierFailureAction::AbortProcess);
 
         self.pass_manager.run(&function.llvm_function);
-
-        self.module.dump();
     }
 
-    pub fn generate(&mut self, declaration: &TypedDeclaration, filename: &str) -> PathBuf {
+    pub fn generate(&mut self, declaration: TypedDeclaration, filename: &str) -> PathBuf {
         let mut object_output_path = PathBuf::from(filename);
         object_output_path.set_extension("o");
 
-        self.declaration(declaration);
+        self.declaration(declaration, false);
+
+        let inner_functions = mem::replace(&mut self.inner_functions, vec![]);
+        for function in inner_functions {
+            self.function_declaration(function);
+        }
+
+        self.module.dump();
+
         if let Err(error) = self.target_machine.emit_to_file(&self.module, object_output_path.as_os_str().to_str().expect("filename"), CodeGenFileType::ObjectFile) {
             // TODO: return error instead?
             eprintln!("Cannot emit to object: {}", error);
         }
 
         object_output_path
-    }
-
-    fn symbol(&self, symbol: Symbol) -> String {
-        self.strings.get(symbol).expect("symbol")
     }
 }
