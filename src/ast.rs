@@ -26,7 +26,7 @@ use symbol::{Symbol, SymbolWithPos};
 pub enum Declaration {
     Function(FuncDeclarationWithPos),
     Type(TypeDecWithPos),
-    VariableDeclaration {
+    Variable {
         escape: bool,
         init: ExprWithPos,
         name: Symbol,

@@ -33,11 +33,12 @@ use types::Type;
 pub enum Declaration {
     Function(TypedFuncDeclaration),
     Type(TypeDecWithPos),
-    VariableDeclaration {
+    Variable {
         escape: bool,
         init: TypedExpr,
         name: Symbol,
         typ: Option<SymbolWithPos>,
+        value: Value,
     },
 }
 
@@ -132,7 +133,7 @@ pub enum Var {
         this: Box<TypedVar>,
     },
     Simple {
-        ident: SymbolWithPos,
+        value: Value,
     },
     Subscript {
         expr: Box<TypedExpr>,

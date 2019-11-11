@@ -49,6 +49,7 @@ use tast::{
     Expr,
     FuncDeclaration,
     TypedDeclaration,
+    Var,
 };
 use types::Type;
 
@@ -102,7 +103,9 @@ pub fn function(module: &Module, result_type: &Type, params: &[Type], name: Symb
         .map(|typ| to_llvm_type(&typ))
         .collect();
     let function_type = types::function::new(to_llvm_type(&result_type), &param_types, false);
-    module.add_function(&strings.get(name).expect("symbol"), function_type)
+    let function = module.add_function(&strings.get(name).expect("symbol"), function_type);
+    function.append_basic_block("entry");
+    function
 }
 
 pub struct Gen {
@@ -156,6 +159,10 @@ impl Gen {
                     self.function_declaration(function.node);
                 }
             },
+            Declaration::Variable { init, value, .. } => {
+                let init_value = self.expr(init.expr);
+                self.builder.store(&init_value, &value);
+            },
             _ => unimplemented!(),
         }
     }
@@ -183,13 +190,17 @@ impl Gen {
                 Expr::Str { ref value } => {
                     self.builder.global_string_ptr(value, "string")
                 },
+                Expr::Variable(variable) => {
+                    let value = self.variable(variable.var);
+                    self.builder.load(to_llvm_type(&variable.typ), &value, "")
+                },
                 _ => unimplemented!("{:?}", expr),
             };
         value
     }
 
     fn function_declaration(&mut self, function: FuncDeclaration) {
-        let entry = function.llvm_function.append_basic_block("entry");
+        let entry = function.llvm_function.get_entry_basic_block();
         self.builder.position_at_end(&entry);
         self.create_argument_allocas(&function.llvm_function, &function);
 
@@ -225,5 +236,13 @@ impl Gen {
         }
 
         object_output_path
+    }
+
+    fn variable(&self, variable: Var) -> Value {
+        match variable {
+            Var::Field { .. } => unimplemented!(),
+            Var::Simple { value } => value,
+            Var::Subscript { .. } => unimplemented!(),
+        }
     }
 }

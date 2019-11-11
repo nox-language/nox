@@ -1,9 +1,8 @@
-let var i := 0
-    var j := 1
-    var k := 2
-in (
+(
+    let var i := 0;
+    let var j := 1;
+    let var k := 2;
     printi(i);
     printi(j);
     printi(k)
 )
-end

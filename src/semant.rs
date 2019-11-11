@@ -22,7 +22,12 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use rlvm::Module;
+use rlvm::{
+    Module,
+    module::Function,
+    types,
+    value::constant,
+};
 
 use ast::{
     Declaration,
@@ -73,11 +78,12 @@ fn var_type_error() -> TypedVar {
     TypedVar {
         pos: Pos::dummy(),
         typ: Type::Error,
-        var: tast::Var::Simple { ident: WithPos::dummy(0) },
+        var: tast::Var::Simple { value: constant::int(types::integer::int32(), 0, true) },
     }
 }
 
 pub struct SemanticAnalyzer<'a> {
+    current_function: Option<Function>,
     env: &'a mut Env,
     errors: Vec<Error>,
     in_loop: bool,
@@ -87,7 +93,8 @@ pub struct SemanticAnalyzer<'a> {
 
 impl<'a> SemanticAnalyzer<'a> {
     pub fn new(env: &'a mut Env, strings: Rc<Strings>, module: &'a Module) -> Self {
-        SemanticAnalyzer {
+        Self {
+            current_function: None,
             env,
             errors: vec![],
             in_loop: false,
@@ -246,14 +253,19 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
 
                 let llvm_function = gen::function(&self.module, &result_type, &parameters, function.name, &self.strings);
+                let previous_function = self.current_function.clone();
+                self.current_function = Some(llvm_function.clone());
 
                 let mut new_params = vec![];
+                let mut values = vec![];
                 for (param, typ) in function.params.iter().zip(&parameters) {
+                    let value = gen::create_entry_block_alloca(&llvm_function, &self.symbol(param.node.name), &typ);
+                    values.push(value.clone());
                     new_params.push(WithPos::new(tast::Field {
                         escape: param.node.escape,
                         name: param.node.name,
                         typ: typ.clone(),
-                        value: gen::create_entry_block_alloca(&llvm_function, &self.symbol(param.node.name), &typ),
+                        value,
                     }, param.pos));
                 }
 
@@ -265,8 +277,8 @@ impl<'a> SemanticAnalyzer<'a> {
                 });
 
                 self.env.begin_scope();
-                for (param, name) in parameters.into_iter().zip(param_names) {
-                    self.env.enter_var(name, Entry::Var { typ: param, value: None });
+                for ((param, name), value) in parameters.into_iter().zip(param_names).zip(values) {
+                    self.env.enter_var(name, Entry::Var { typ: param, value });
                 }
                 let exp = self.trans_exp(function.body, done_label.clone());
                 self.check_types(&result_type, &exp.typ, exp.pos);
@@ -280,6 +292,8 @@ impl<'a> SemanticAnalyzer<'a> {
                     result_type,
                 }, pos);
 
+                self.current_function = previous_function;
+
                 Some(WithPos::new(tast::Declaration::Function(declaration), pos))
             },
             Declaration::Type(type_declaration) => {
@@ -290,7 +304,7 @@ impl<'a> SemanticAnalyzer<'a> {
 
                 Some(WithPos::new(tast::Declaration::Type(type_declaration), declaration.pos))
             },
-            Declaration::VariableDeclaration { escape, init, name, typ, .. } => {
+            Declaration::Variable { escape, init, name, typ, .. } => {
                 let init = self.trans_exp(init, done_label);
                 if let Some(ref ident) = typ {
                     let typ = self.get_type(ident, AddError);
@@ -299,12 +313,14 @@ impl<'a> SemanticAnalyzer<'a> {
                 else if init.typ == Type::Nil {
                     return self.add_error(Error::RecordType { pos: declaration.pos }, None);
                 }
-                self.env.enter_var(name, Entry::Var { typ: init.typ.clone(), value: None });
-                Some(WithPos::new(tast::Declaration::VariableDeclaration {
+                let value = gen::create_entry_block_alloca(&self.current_function(), &self.symbol(name), &init.typ);
+                self.env.enter_var(name, Entry::Var { typ: init.typ.clone(), value: value.clone() });
+                Some(WithPos::new(tast::Declaration::Variable {
                     escape,
                     init,
                     name,
                     typ,
+                    value,
                 }, declaration.pos))
             },
         }
@@ -571,11 +587,11 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Var::Simple { ident } => {
-                if let Some(Entry::Var { ref typ, .. }) = self.env.look_var(ident.node).cloned() { // TODO: remove this clone.
+                if let Some(Entry::Var { typ, value }) = self.env.look_var(ident.node).cloned() { // TODO: remove this clone.
                     return TypedVar {
                         pos: var.pos,
-                        typ: self.actual_ty_var(typ),
-                        var: tast::Var::Simple { ident },
+                        typ: self.actual_ty_var(&typ),
+                        var: tast::Var::Simple { value },
                     };
                 }
                 self.undefined_variable(ident.node, var.pos)
@@ -677,5 +693,9 @@ impl<'a> SemanticAnalyzer<'a> {
             pos,
             struct_name,
         }, var_type_error())
+    }
+
+    fn current_function(&self) -> Function {
+        self.current_function.clone().expect("function")
     }
 }

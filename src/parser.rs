@@ -52,7 +52,7 @@ use ast::{
     VarWithPos,
     dummy_var_expr,
 };
-use ast::Declaration::VariableDeclaration;
+use ast::Declaration::Variable;
 use error::Error;
 use error::Error::UnexpectedToken;
 use lexer::Lexer;
@@ -321,7 +321,7 @@ impl<'a, R: Read> Parser<'a, R> {
 
         let declarations = Expr::Sequence(vec![
             WithPos::dummy(Expr::Let(
-                Box::new(WithPos::dummy(VariableDeclaration {
+                Box::new(WithPos::dummy(Variable {
                     escape: false,
                     init: start,
                     name: start_symbol,
@@ -329,7 +329,7 @@ impl<'a, R: Read> Parser<'a, R> {
                 }))
             )),
             WithPos::dummy(Expr::Let(
-                Box::new(WithPos::dummy(VariableDeclaration {
+                Box::new(WithPos::dummy(Variable {
                     escape: false,
                     init: end,
                     name: end_symbol,
@@ -667,7 +667,7 @@ impl<'a, R: Read> Parser<'a, R> {
         let name = self.symbols.symbol(&var_name);
         eat!(self, ColonEqual);
         let init = self.expr()?;
-        Ok(WithPos::new(VariableDeclaration {
+        Ok(WithPos::new(Variable {
             escape: false,
             init,
             name,

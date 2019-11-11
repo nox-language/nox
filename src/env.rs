@@ -44,7 +44,7 @@ pub enum Entry {
     },
     Var {
         typ: Type,
-        value: Option<Value>,
+        value: Value,
     },
     Error,
 }
