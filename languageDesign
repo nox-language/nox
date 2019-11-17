@@ -7,6 +7,26 @@ thread_spawn(value: T)
 
 give lifetime to thread (to share references between threads)?
 
+Think about sharing data between threads:
+maybe allow the programmer to specify that a value is shareable:
+
+let spin_lock(): SpinLock
+    assume is_shareable(result)
+Markers are probably better for that? Does the compiler need to know the concept of shareability?
+
+Safe atomics: https://readthedocs.org/projects/ats-documentation/downloads/pdf/latest/
+
+=== Markers
+
+Markers are a way to say what a type is.
+
+mark Send
+
+assume(i32.is(Send))
+
+fn thread_spawn(callback: fn())
+    ensure callback.is(Send)
+
 == Inspirations
 
 Essayer le langage Whiley.
@@ -22,7 +42,28 @@ let vector_push(&vector, a)
 
 Can we generalize this to allow multiple mutable references on the vector?
 
+Cannot return reference to local variable.
+Cannot move non-static reference to move function.
+
+=== No memory leak
+
+For ensuring memory deallocation, have post-condition like:
+
+let malloc(): ptr
+    ensure result == 0 || will_call(free(result))
+This seems complicated. Think about something else inspired by linear types, maybe:
+let malloc(): ptr
+    ensure result == 0 || will_consume(result)
+
+=== No access to uninitialized values
+
+Think about uninitialized values (from malloc).
+No implicit free to avoid freeing uninitialized memory.
+Functions to work with uninitialized memory.
+
 == User-friendlyness
+
+=== Less boilerplate
 
 Permissions are an alias for a precondition.
 
@@ -37,51 +78,28 @@ Maybe we don't need permissions. It could only be types:
 type &mut T = *T
 ensures is_unique(*T)
 
-== TODO
-
-For ensuring memory deallocation, have post-condition like:
-
-let malloc(): ptr
-    ensure result == 0 || will_call(free(result))
-This seems complicated. Think about something else inspired by linear types, maybe:
-let malloc(): ptr
-    ensure result == 0 || will_consume(result)
-
-Think about uninitialized values (from malloc).
-No implicit free to avoid freeing uninitialized memory.
-Functions to work with uninitialized memory.
-
-Think about sharing data between threads:
-maybe allow the programmer to specify that a value is shareable:
-
-let spin_lock(): SpinLock
-    assume is_shareable(result)
-Markers are probably better for that? Does the compiler need to know the concept of shareability?
-
-Cannot return reference to local variable.
-Cannot move non-static reference to move function.
-
-Markers are a way to say what a type is.
-
-mark Send
-
-assume(i32.is(Send))
-
-fn thread_spawn(callback: fn())
-    ensure callback.is(Send)
+=== Freeing memory
 
 To free memory at the end of a function:
 defer free()
 
+=== Indexing
+
 Allow to use u8, u16, u32 and u64 instead of usize if their size (or value?) <= size_of(usize).
 Same for i8, i16, i32, i64 if they are greater than or equal to 0.
 
-Safe atomics: https://readthedocs.org/projects/ats-documentation/downloads/pdf/latest/
+=== Arrays
 
 Allow multiple shared references to the same array if we can prove that the indexes are different?
+
+=== Lifetimes
 
 Is the concept of lifetimes implicit or explicit in
 let vector_get(&vector, &useless): &a
 ?
 If it's implicit, it means the compiler needs to do a whole program analysis before being able to infer the lifetimes here.
 Isn't it what the type inference do anyway?
+
+== Strings
+
+Use latin1?
