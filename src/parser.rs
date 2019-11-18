@@ -283,7 +283,7 @@ impl<'a, R: Read> Parser<'a, R> {
         let body =
             Expr::If {
                 else_: None,
-                test: Box::new(
+                condition: Box::new(
                     WithPos::dummy(Expr::Oper {
                         left: Box::new(iter_variable_expr.clone()),
                         oper: WithPos::dummy(Operator::Le),
@@ -296,7 +296,7 @@ impl<'a, R: Read> Parser<'a, R> {
                             body,
                             WithPos::dummy(Expr::If {
                                 else_: Some(Box::new(WithPos::dummy(Expr::Break))),
-                                test:
+                                condition:
                                     Box::new(WithPos::dummy(Expr::Oper {
                                         left: Box::new(iter_variable_expr.clone()),
                                         oper: WithPos::dummy(Operator::Lt),
@@ -313,7 +313,7 @@ impl<'a, R: Read> Parser<'a, R> {
                                     })),
                             }),
                         ]))),
-                        test: Box::new(WithPos::dummy(Expr::Int {
+                        condition: Box::new(WithPos::dummy(Expr::Int {
                             value: 1,
                         })),
                     })),
@@ -363,7 +363,7 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn if_then_else(&mut self) -> Result<ExprWithPos> {
         let pos = eat!(self, If);
-        let test = Box::new(self.expr()?);
+        let condition = Box::new(self.expr()?);
         eat!(self, Then);
         let then = Box::new(self.expr()?);
         let else_=
@@ -376,7 +376,7 @@ impl<'a, R: Read> Parser<'a, R> {
             };
         Ok(WithPos::new(Expr::If {
             else_,
-            test,
+            condition,
             then,
         }, pos))
     }
@@ -677,12 +677,12 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn while_loop(&mut self) -> Result<ExprWithPos> {
         let pos = eat!(self, While);
-        let test = Box::new(self.expr()?);
+        let condition = Box::new(self.expr()?);
         eat!(self, Do);
         let body = Box::new(self.expr()?);
         Ok(WithPos::new(Expr::While {
             body,
-            test,
+            condition,
         }, pos))
     }
 

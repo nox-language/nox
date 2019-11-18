@@ -61,8 +61,8 @@ pub enum Expr {
         llvm_function: Function,
     },
     If {
+        condition: Box<TypedExpr>,
         else_: Option<Box<TypedExpr>>,
-        test: Box<TypedExpr>,
         then: Box<TypedExpr>,
     },
     Int {
@@ -86,7 +86,7 @@ pub enum Expr {
     Variable(TypedVar),
     While {
         body: Box<TypedExpr>,
-        test: Box<TypedExpr>,
+        condition: Box<TypedExpr>,
     },
 }
 

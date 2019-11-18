@@ -393,9 +393,9 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
                 return self.undefined_function(function, expr.pos);
             },
-            Expr::If { else_, test, then } => {
-                let test = Box::new(self.trans_exp(*test, done_label.clone()));
-                self.check_int(&test, then.pos);
+            Expr::If { else_, condition, then } => {
+                let condition = Box::new(self.trans_exp(*condition, done_label.clone()));
+                self.check_int(&condition, then.pos);
                 let if_expr = Box::new(self.trans_exp(*then, done_label.clone()));
                 let (else_, typ) =
                     match else_ {
@@ -410,7 +410,7 @@ impl<'a> SemanticAnalyzer<'a> {
                         },
                     };
                 TypedExpr {
-                    expr: tast::Expr::If { else_, test, then: if_expr },
+                    expr: tast::Expr::If { else_, condition, then: if_expr },
                     pos: expr.pos,
                     typ,
                 }
@@ -528,9 +528,9 @@ impl<'a> SemanticAnalyzer<'a> {
                     typ,
                 }
             },
-            Expr::While { body, test } => {
-                let test_expr = self.trans_exp(*test, done_label);
-                self.check_int(&test_expr, test_expr.pos);
+            Expr::While { body, condition } => {
+                let condition_expr = self.trans_exp(*condition, done_label);
+                self.check_int(&condition_expr, condition_expr.pos);
                 let old_in_loop = self.in_loop;
                 self.in_loop = true;
                 let while_done_label = Label::new();

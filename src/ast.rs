@@ -53,8 +53,8 @@ pub enum Expr {
         function: Symbol,
     },
     If {
+        condition: Box<ExprWithPos>,
         else_: Option<Box<ExprWithPos>>,
-        test: Box<ExprWithPos>,
         then: Box<ExprWithPos>,
     },
     Int {
@@ -78,7 +78,7 @@ pub enum Expr {
     Variable(VarWithPos),
     While {
         body: Box<ExprWithPos>,
-        test: Box<ExprWithPos>,
+        condition: Box<ExprWithPos>,
     },
 }
 

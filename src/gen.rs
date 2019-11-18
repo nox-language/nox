@@ -24,11 +24,13 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use rlvm::{
+    BasicBlock,
     Builder,
     CodeGenFileType,
     CodeGenOptLevel,
     CodeModel,
     FunctionPassManager,
+    IntPredicate,
     Module,
     RealPredicate,
     RelocMode,
@@ -174,12 +176,78 @@ impl Gen {
                     let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(arg.expr)).collect();
                     self.builder.call(llvm_function.clone(), &arguments, "")
                 },
+                Expr::If { condition, then, else_ } => {
+                    let condition = self.expr(condition.expr);
+                    let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "ifcond");
+
+                    let start_basic_block = self.builder.get_insert_block().expect("start basic block");
+
+                    let function = start_basic_block.get_parent();
+
+                    let then_basic_block = BasicBlock::append(&function, "then");
+
+                    self.builder.position_at_end(&then_basic_block);
+
+                    let then_value = self.expr(then.expr);
+
+                    let new_then_basic_block = self.builder.get_insert_block().expect("new then basic block");
+
+                    let else_basic_block = BasicBlock::append(&function, "else");
+                    self.builder.position_at_end(&else_basic_block);
+
+                    let else_value = else_.map(|else_| self.expr(else_.expr));
+
+                    let new_else_basic_block = self.builder.get_insert_block().expect("new else basic block");
+
+                    let merge_basic_block = BasicBlock::append(&function, "ifcont");
+                    self.builder.position_at_end(&merge_basic_block);
+
+                    let phi = self.builder.phi(types::int32(), "result");
+                    if let Some(else_value) = else_value {
+                        phi.add_incoming(&[(&then_value, &new_then_basic_block), (&else_value, &new_else_basic_block)]);
+
+                    }
+                    else {
+                        phi.add_incoming(&[(&then_value, &new_then_basic_block)]);
+                    }
+
+                    self.builder.position_at_end(&start_basic_block);
+                    self.builder.cond_br(&condition, &then_basic_block, &else_basic_block);
+
+                    self.builder.position_at_end(&new_then_basic_block);
+                    self.builder.br(&merge_basic_block);
+
+                    self.builder.position_at_end(&new_else_basic_block);
+                    self.builder.br(&merge_basic_block);
+
+                    self.builder.position_at_end(&merge_basic_block);
+
+                    phi
+                },
                 Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
                 Expr::Let(declaration) => {
                     self.declaration(*declaration, true);
                     self.expr(Expr::Nil)
                 },
                 Expr::Nil => constant::int(types::integer::int32(), 0, true), // TODO: use pointer type?
+                Expr::Oper { left, oper, right } => {
+                    let left = self.expr(left.expr);
+                    let right = self.expr(right.expr);
+                    match oper.node {
+                        Operator::And => unimplemented!(),
+                        Operator::Divide => unimplemented!(),
+                        Operator::Equal => self.builder.icmp(IntPredicate::Equal, &left, &right, "cmptmp"),
+                        Operator::Ge => self.builder.icmp(IntPredicate::SignedGreaterThanOrEqual, &left, &right, "cmptmp"),
+                        Operator::Gt => self.builder.icmp(IntPredicate::SignedGreaterThan, &left, &right, "cmptmp"),
+                        Operator::Le => self.builder.icmp(IntPredicate::SignedLesserThanOrEqual, &left, &right, "cmptmp"),
+                        Operator::Lt => self.builder.icmp(IntPredicate::SignedLesserThan, &left, &right, "cmptmp"),
+                        Operator::Minus => unimplemented!(),
+                        Operator::Neq => self.builder.icmp(IntPredicate::NotEqual, &left, &right, "cmptmp"),
+                        Operator::Or => unimplemented!(),
+                        Operator::Plus => self.builder.add(&left, &right, "sum"),
+                        Operator::Times => unimplemented!(),
+                    }
+                },
                 Expr::Sequence(mut exprs) => {
                     let last_expr = exprs.pop().expect("at least one expression in sequence");
                     for expr in exprs {
@@ -210,7 +278,7 @@ impl Gen {
             self.builder.ret_no_value();
         }
         else {
-            self.builder.ret(return_value);
+            self.builder.ret(&return_value);
         }
         function.llvm_function.verify(VerifierFailureAction::AbortProcess);
 

@@ -15,7 +15,7 @@ dependencies = [
 [[package]]
 name = "rlvm"
 version = "0.0.2"
-source = "git+ssh://git@framagit.org/antoyo/rlvm.git#e902688162b04a12de680f27301e05a6988cf5e9"
+source = "git+ssh://git@framagit.org/antoyo/rlvm.git#b7fc60b9f78f75829612c7d310e816413c8d541a"
 dependencies = [
  "cc 1.0.47 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

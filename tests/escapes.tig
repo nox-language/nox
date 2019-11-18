@@ -1,6 +1,6 @@
-let var N := 8
-in
+(
+    let var N := 8;
     print("\n\t\\\"\065\
     	\test\n")
-end
+)
 

@@ -20,6 +20,7 @@
  */
 
 /*
+ * TODO: require a main function.
  * TODO: call exit in main (that requires writing an alternative runtime).
  */
 
