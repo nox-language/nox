@@ -285,11 +285,13 @@ impl Gen {
         self.pass_manager.run(&function.llvm_function);
     }
 
-    pub fn generate(&mut self, declaration: TypedDeclaration, filename: &str) -> PathBuf {
+    pub fn generate(&mut self, declarations: Vec<TypedDeclaration>, filename: &str) -> PathBuf {
         let mut object_output_path = PathBuf::from(filename);
         object_output_path.set_extension("o");
 
-        self.declaration(declaration, false);
+        for declaration in declarations {
+            self.declaration(declaration, false);
+        }
 
         let inner_functions = mem::replace(&mut self.inner_functions, vec![]);
         for function in inner_functions {

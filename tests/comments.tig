@@ -1,4 +1,4 @@
-(
+fun main() = (
     let var N := 8;
     /*
      *  var B := 42

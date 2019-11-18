@@ -20,7 +20,7 @@
  */
 
 /*
- * TODO: require a main function.
+ * TODO: error on missing a main function.
  * TODO: call exit in main (that requires writing an alternative runtime).
  */
 
@@ -39,7 +39,6 @@ mod position;
 mod semant;
 mod symbol;
 mod tast;
-mod temp;
 mod token;
 mod types;
 
@@ -92,18 +91,17 @@ fn drive() -> Result<(), Error> {
         let file = BufReader::new(File::open(&filename)?);
         let lexer = Lexer::new(file);
         let mut symbols = Symbols::new(Rc::clone(&strings));
-        let main_symbol = symbols.symbol("main");
         let mut parser = Parser::new(lexer, &mut symbols);
         let ast = parser.parse()?;
         let module = Module::new_with_name("module");
         let mut env = Env::new(&strings, &module);
         {
             let semantic_analyzer = SemanticAnalyzer::new(&mut env, Rc::clone(&strings), &module);
-            let declaration = semantic_analyzer.analyze(main_symbol, ast)?;
+            let functions = semantic_analyzer.analyze(ast)?;
             env.end_scope(); // TODO: move after the semantic analysis?
 
             let mut gen = Gen::new(module);
-            let object_output_path = gen.generate(declaration, &filename);
+            let object_output_path = gen.generate(functions, &filename);
 
             let mut executable_output_path = PathBuf::from(&filename);
             executable_output_path.set_extension("");

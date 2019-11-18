@@ -40,7 +40,7 @@ pub enum Tok {
     End,
     Equal,
     For,
-    Function,
+    Fun,
     Greater,
     GreaterOrEqual,
     Ident(String),

@@ -19,6 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+// TODO: use precedence-based parsing.
+
 /*
  * Operator precedence:
  * -
@@ -201,7 +203,7 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn dec(&mut self) -> Result<DeclarationWithPos> {
         match self.peek()?.token {
-            Function => {
+            Fun => {
                 let function = self.fun_dec()?;
                 let pos = function.pos;
                 Ok(WithPos::new(Declaration::Function(function), pos))
@@ -343,7 +345,7 @@ impl<'a, R: Read> Parser<'a, R> {
     }
 
     fn fun_dec(&mut self) -> Result<FuncDeclarationWithPos> {
-        let pos = eat!(self, Function);
+        let pos = eat!(self, Fun);
         let func_name;
         eat!(self, Ident, func_name);
         let name = self.symbols.symbol(&func_name);
@@ -686,12 +688,17 @@ impl<'a, R: Read> Parser<'a, R> {
         }, pos))
     }
 
-    pub fn parse(&mut self) -> Result<ExprWithPos> {
-        let main_expression = self.expr()?;
-        match self.token() {
-            Err(Error::Eof) => Ok(main_expression),
-            _ => Err(self.unexpected_token("end of file")?),
+    pub fn parse(&mut self) -> Result<Vec<FuncDeclarationWithPos>> {
+        let mut functions = vec![];
+        loop {
+            match self.peek_token() {
+                Err(Error::Eof) => break,
+                Err(error) => return Err(error.clone()),
+                Ok(_) => functions.push(self.fun_dec()?),
+            }
         }
+
+        Ok(functions)
     }
 
     fn peek(&mut self) -> result::Result<&Token, &Error> {

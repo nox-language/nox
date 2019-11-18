@@ -164,7 +164,7 @@ impl<R: Read> Lexer<R> {
                 "else" => Else,
                 "end" => End,
                 "for" => For,
-                "function" => Function,
+                "fun" => Fun,
                 "if" => If,
                 "in" => In,
                 "let" => Let,

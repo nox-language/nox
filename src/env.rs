@@ -31,13 +31,11 @@ use rlvm::{
 
 use gen;
 use symbol::{Strings, Symbol, Symbols};
-use temp::Label;
 use types::Type;
 
 #[derive(Clone)]
 pub enum Entry {
     Fun {
-        label: Label,
         llvm_function: Function,
         parameters: Vec<Type>,
         result: Type,
@@ -84,7 +82,6 @@ impl Env {
         let function_type = types::function::new(result_type, &param_types, false);
         let llvm_function = module.add_function(name, function_type);
         let entry = Entry::Fun {
-            label: Label::with_name(name),
             llvm_function,
             parameters,
             result,

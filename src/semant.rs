@@ -35,7 +35,7 @@ use ast::{
     Expr,
     ExprWithPos,
     FieldWithPos,
-    FuncDeclaration,
+    FuncDeclarationWithPos,
     Operator,
     OperatorWithPos,
     RecordFieldWithPos,
@@ -57,7 +57,6 @@ use tast::{
     TypedExpr,
     TypedVar,
 };
-use temp::Label;
 use types::{Type, Unique};
 
 #[derive(PartialEq)]
@@ -108,23 +107,13 @@ impl<'a> SemanticAnalyzer<'a> {
         node
     }
 
-    pub fn analyze(mut self, main_symbol: Symbol, expr: ExprWithPos) -> Result<TypedDeclaration> {
-        let pos = expr.pos;
-        let body = WithPos::new(
-            Expr::Sequence(vec![expr, WithPos::new(Expr::Int { value: 0 }, pos)]),
-            pos,
-        );
-        let result = Some(WithPos::new(self.env.type_symbol("int"), pos));
-        let declaration = self.trans_dec(WithPos::new(Declaration::Function(
-            WithPos::new(FuncDeclaration {
-                body,
-                name: main_symbol,
-                params: vec![],
-                result,
-            }, pos)
-        ), pos), None);
+    pub fn analyze(mut self, functions: Vec<FuncDeclarationWithPos>) -> Result<Vec<TypedDeclaration>> {
+        let mut declarations = vec![];
+        for function in functions {
+            declarations.push(self.trans_fun(function));
+        }
         if self.errors.is_empty() {
-            Ok(declaration.expect("declaration")) // TODO: remove expect()?
+            Ok(declarations)
         }
         else {
             Err(Error::Multi(self.errors))
@@ -147,11 +136,11 @@ impl<'a> SemanticAnalyzer<'a> {
         typ
     }
 
-    fn check_binary_op(&mut self, oper: OperatorWithPos, left: ExprWithPos, right: ExprWithPos, done_label: Option<Label>, pos: Pos) -> TypedExpr
+    fn check_binary_op(&mut self, oper: OperatorWithPos, left: ExprWithPos, right: ExprWithPos, pos: Pos) -> TypedExpr
     {
-        let left = Box::new(self.trans_exp(left, done_label.clone()));
+        let left = Box::new(self.trans_exp(left));
         self.check_int(&left, left.pos);
-        let right = Box::new(self.trans_exp(right, done_label));
+        let right = Box::new(self.trans_exp(right));
         self.check_int(&right, right.pos);
         TypedExpr {
             expr: tast::Expr::Oper { left, oper, right },
@@ -220,82 +209,9 @@ impl<'a> SemanticAnalyzer<'a> {
         self.undefined_identifier(symbol)
     }
 
-    fn trans_dec(&mut self, declaration: DeclarationWithPos, done_label: Option<Label>) -> Option<TypedDeclaration> {
+    fn trans_dec(&mut self, declaration: DeclarationWithPos) -> Option<TypedDeclaration> {
         match declaration.node {
-            Declaration::Function(declaration) => {
-                let function = declaration.node;
-                // TODO: error when name already exist?
-                let mut param_names = vec![];
-                let mut parameters = vec![];
-                let mut param_set = HashSet::new();
-                for param in &function.params {
-                    parameters.push(self.get_type(&param.node.typ, AddError));
-                    param_names.push(param.node.name);
-                    if !param_set.insert(param.node.name) {
-                        self.duplicate_param(&param);
-                    }
-                }
-                let func_name = self.strings.get(function.name).expect("strings get");
-
-                let result_type =
-                    if let Some(ref result) = function.result {
-                        self.get_type(result, DontAddError)
-                    }
-                    else {
-                        Type::Unit
-                    };
-                let mut param_names = vec![];
-                let mut parameters = vec![];
-                for param in &function.params {
-                    let typ = self.get_type(&param.node.typ, DontAddError);
-                    parameters.push(typ.clone());
-                    param_names.push(param.node.name);
-                }
-
-                let llvm_function = gen::function(&self.module, &result_type, &parameters, function.name, &self.strings);
-                let previous_function = self.current_function.clone();
-                self.current_function = Some(llvm_function.clone());
-
-                let mut new_params = vec![];
-                let mut values = vec![];
-                for (param, typ) in function.params.iter().zip(&parameters) {
-                    let value = gen::create_entry_block_alloca(&llvm_function, &self.symbol(param.node.name), &typ);
-                    values.push(value.clone());
-                    new_params.push(WithPos::new(tast::Field {
-                        escape: param.node.escape,
-                        name: param.node.name,
-                        typ: typ.clone(),
-                        value,
-                    }, param.pos));
-                }
-
-                self.env.enter_var(function.name, Entry::Fun {
-                    label: Label::with_name(&func_name),
-                    llvm_function: llvm_function.clone(),
-                    parameters: parameters.clone(),
-                    result: result_type.clone(),
-                });
-
-                self.env.begin_scope();
-                for ((param, name), value) in parameters.into_iter().zip(param_names).zip(values) {
-                    self.env.enter_var(name, Entry::Var { typ: param, value });
-                }
-                let exp = self.trans_exp(function.body, done_label.clone());
-                self.check_types(&result_type, &exp.typ, exp.pos);
-                self.env.end_scope();
-                let pos = declaration.pos;
-                let declaration = WithPos::new(tast::FuncDeclaration {
-                    body: exp,
-                    llvm_function,
-                    name: function.name,
-                    params: new_params,
-                    result_type,
-                }, pos);
-
-                self.current_function = previous_function;
-
-                Some(WithPos::new(tast::Declaration::Function(declaration), pos))
-            },
+            Declaration::Function(function) => Some(self.trans_fun(function)),
             Declaration::Type(type_declaration) => {
                 self.check_duplicate_types(&type_declaration);
                 let name = &type_declaration.node.name;
@@ -305,7 +221,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 Some(WithPos::new(tast::Declaration::Type(type_declaration), declaration.pos))
             },
             Declaration::Variable { escape, init, name, typ, .. } => {
-                let init = self.trans_exp(init, done_label);
+                let init = self.trans_exp(init);
                 if let Some(ref ident) = typ {
                     let typ = self.get_type(ident, AddError);
                     self.check_types(&typ, &init.typ, ident.pos);
@@ -326,13 +242,13 @@ impl<'a> SemanticAnalyzer<'a> {
         }
     }
 
-    pub fn trans_exp(&mut self, expr: ExprWithPos, done_label: Option<Label>) -> TypedExpr {
+    pub fn trans_exp(&mut self, expr: ExprWithPos) -> TypedExpr {
         match expr.node {
             Expr::Array { init, size, typ } => {
-                let size_expr = self.trans_exp(*size, done_label.clone());
+                let size_expr = self.trans_exp(*size);
                 self.check_int(&size_expr, size_expr.pos);
                 let ty = self.get_type(&typ, AddError);
-                let init_expr = self.trans_exp(*init, done_label);
+                let init_expr = self.trans_exp(*init);
                 match ty {
                     Type::Array(ref typ, _) =>
                         self.check_types(typ, &init_expr.typ, init_expr.pos),
@@ -350,8 +266,8 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Expr::Assign { expr, var } => {
-                let var = self.trans_var(var, done_label.clone());
-                let expr = Box::new(self.trans_exp(*expr, done_label));
+                let var = self.trans_var(var);
+                let expr = Box::new(self.trans_exp(*expr));
                 self.check_types(&var.typ, &expr.typ, expr.pos);
                 let pos = expr.pos;
                 TypedExpr {
@@ -378,7 +294,7 @@ impl<'a> SemanticAnalyzer<'a> {
                         Entry::Fun { ref llvm_function, ref parameters, ref result, .. } => {
                             let mut expr_args = vec![];
                             for (arg, param) in args.into_iter().zip(parameters) {
-                                let exp = self.trans_exp(arg, done_label.clone());
+                                let exp = self.trans_exp(arg);
                                 self.check_types(param, &exp.typ, exp.pos);
                                 expr_args.push(exp);
                             }
@@ -394,13 +310,13 @@ impl<'a> SemanticAnalyzer<'a> {
                 return self.undefined_function(function, expr.pos);
             },
             Expr::If { else_, condition, then } => {
-                let condition = Box::new(self.trans_exp(*condition, done_label.clone()));
+                let condition = Box::new(self.trans_exp(*condition));
                 self.check_int(&condition, then.pos);
-                let if_expr = Box::new(self.trans_exp(*then, done_label.clone()));
+                let if_expr = Box::new(self.trans_exp(*then));
                 let (else_, typ) =
                     match else_ {
                         Some(else_) => {
-                            let else_expr = Box::new(self.trans_exp(*else_, done_label));
+                            let else_expr = Box::new(self.trans_exp(*else_));
                             self.check_types(&if_expr.typ, &else_expr.typ, else_expr.pos);
                             (Some(else_expr), if_expr.typ.clone())
                         },
@@ -425,7 +341,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 let old_in_loop = self.in_loop;
                 // TODO: why set in_loop to false here?
                 self.in_loop = false;
-                let declaration = self.trans_dec(*declaration, done_label.clone());
+                let declaration = self.trans_dec(*declaration);
                 self.in_loop = old_in_loop;
                 TypedExpr {
                     expr: tast::Expr::Let(Box::new(declaration.expect("declaration"))), // TODO: handle error.
@@ -445,15 +361,15 @@ impl<'a> SemanticAnalyzer<'a> {
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::And, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Or, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Divide, .. }, right } =>
-                self.check_binary_op(oper, *left, *right, done_label, expr.pos),
+                self.check_binary_op(oper, *left, *right, expr.pos),
             Expr::Oper { left, oper: oper@WithPos { node: Operator::Equal, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Neq, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Lt, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Gt, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Ge, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Le, .. }, right } => {
-                let left = Box::new(self.trans_exp(*left, done_label.clone()));
-                let right = Box::new(self.trans_exp(*right, done_label));
+                let left = Box::new(self.trans_exp(*left));
+                let right = Box::new(self.trans_exp(*right));
                 self.check_int(&left, left.pos);
                 self.check_int(&right, right.pos);
                 TypedExpr {
@@ -470,7 +386,7 @@ impl<'a> SemanticAnalyzer<'a> {
                         for &(type_field_name, ref type_field) in type_fields {
                             if let Some(index) = fields.iter().position(|field| field.node.ident == type_field_name) {
                                 let field = fields.remove(index);
-                                let expr = self.trans_exp(field.node.expr, done_label.clone());
+                                let expr = self.trans_exp(field.node.expr);
                                 self.check_types(&type_field, &expr.typ, expr.pos);
                                 field_exprs.push(WithPos::new(tast::RecordField { expr, ident: field.node.ident }, field.pos));
                             }
@@ -503,7 +419,7 @@ impl<'a> SemanticAnalyzer<'a> {
             Expr::Sequence(exprs) => {
                 self.env.begin_scope();
                 let new_exprs: Vec<_> = exprs.into_iter()
-                    .map(|expr| self.trans_exp(expr, done_label.clone()))
+                    .map(|expr| self.trans_exp(expr))
                     .collect();
                 self.env.end_scope();
                 let typ = new_exprs.last().cloned().expect("Unexpected empty sequence").typ;
@@ -520,7 +436,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     typ: Type::String,
                 },
             Expr::Variable(var) => {
-                let var = self.trans_var(var, done_label);
+                let var = self.trans_var(var);
                 let typ = var.typ.clone();
                 TypedExpr {
                     expr: tast::Expr::Variable(var),
@@ -529,16 +445,88 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Expr::While { body, condition } => {
-                let condition_expr = self.trans_exp(*condition, done_label);
+                let condition_expr = self.trans_exp(*condition);
                 self.check_int(&condition_expr, condition_expr.pos);
                 let old_in_loop = self.in_loop;
                 self.in_loop = true;
-                let while_done_label = Label::new();
-                let result = self.trans_exp(*body, Some(while_done_label.clone()));
+                let result = self.trans_exp(*body);
                 self.in_loop = old_in_loop;
                 result
             },
         }
+    }
+
+    fn trans_fun(&mut self, function: FuncDeclarationWithPos) -> TypedDeclaration {
+        let pos = function.pos;
+        let function = function.node;
+        // TODO: error when name already exist?
+        let mut param_names = vec![];
+        let mut parameters = vec![];
+        let mut param_set = HashSet::new();
+        for param in &function.params {
+            parameters.push(self.get_type(&param.node.typ, AddError));
+            param_names.push(param.node.name);
+            if !param_set.insert(param.node.name) {
+                self.duplicate_param(&param);
+            }
+        }
+
+        let result_type =
+            if let Some(ref result) = function.result {
+                self.get_type(result, DontAddError)
+            }
+            else {
+                Type::Unit
+            };
+        let mut param_names = vec![];
+        let mut parameters = vec![];
+        for param in &function.params {
+            let typ = self.get_type(&param.node.typ, DontAddError);
+            parameters.push(typ.clone());
+            param_names.push(param.node.name);
+            }
+
+        let llvm_function = gen::function(&self.module, &result_type, &parameters, function.name, &self.strings);
+        let previous_function = self.current_function.clone();
+        self.current_function = Some(llvm_function.clone());
+
+        let mut new_params = vec![];
+        let mut values = vec![];
+        for (param, typ) in function.params.iter().zip(&parameters) {
+            let value = gen::create_entry_block_alloca(&llvm_function, &self.symbol(param.node.name), &typ);
+            values.push(value.clone());
+            new_params.push(WithPos::new(tast::Field {
+                escape: param.node.escape,
+                name: param.node.name,
+                typ: typ.clone(),
+                value,
+            }, param.pos));
+            }
+
+        self.env.enter_var(function.name, Entry::Fun {
+            llvm_function: llvm_function.clone(),
+            parameters: parameters.clone(),
+            result: result_type.clone(),
+        });
+
+        self.env.begin_scope();
+        for ((param, name), value) in parameters.into_iter().zip(param_names).zip(values) {
+            self.env.enter_var(name, Entry::Var { typ: param, value });
+            }
+        let exp = self.trans_exp(function.body);
+        self.check_types(&result_type, &exp.typ, exp.pos);
+        self.env.end_scope();
+        let function = WithPos::new(tast::FuncDeclaration {
+            body: exp,
+            llvm_function,
+            name: function.name,
+            params: new_params,
+            result_type,
+        }, pos);
+
+        self.current_function = previous_function;
+
+        WithPos::new(tast::Declaration::Function(function), pos)
     }
 
     fn trans_ty(&mut self, symbol: Symbol, ty: &TyWithPos) -> Type {
@@ -559,10 +547,10 @@ impl<'a> SemanticAnalyzer<'a> {
         }
     }
 
-    fn trans_var(&mut self, var: VarWithPos, done_label: Option<Label>) -> TypedVar {
+    fn trans_var(&mut self, var: VarWithPos) -> TypedVar {
         match var.node {
             Var::Field { ident, this } => {
-                let this = Box::new(self.trans_var(*this, done_label));
+                let this = Box::new(self.trans_var(*this));
                 match this.typ {
                     Type::Record(record_type, ref fields, _) => {
                         for &(name, ref typ) in fields {
@@ -597,8 +585,8 @@ impl<'a> SemanticAnalyzer<'a> {
                 self.undefined_variable(ident.node, var.pos)
             },
             Var::Subscript { expr, this } => {
-                let var = Box::new(self.trans_var(*this, done_label.clone()));
-                let subscript_expr = Box::new(self.trans_exp(*expr, done_label));
+                let var = Box::new(self.trans_var(*this));
+                let subscript_expr = Box::new(self.trans_exp(*expr));
                 self.check_int(&subscript_expr, subscript_expr.pos);
                 match var.typ.clone() {
                     Type::Array(typ, _) => TypedVar {

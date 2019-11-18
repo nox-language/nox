@@ -1,16 +1,19 @@
-(
-    let function maximum(a: int, b: int): int =
-            if a > b then
-                a
-            else
-                b;
-    let function minimum(a: int, b: int): int =
-        if a < b then
-            a
-        else
-            b;
-    let function sum10(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, i: int, j: int): int =
-        a + b + c + d + e + f + g + h + i + j;
+fun maximum(a: int, b: int): int =
+    if a > b then
+        a
+    else
+        b
+
+fun minimum(a: int, b: int): int =
+    if a < b then
+        a
+    else
+        b
+
+fun sum10(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, i: int, j: int): int =
+    a + b + c + d + e + f + g + h + i + j
+
+fun main() = (
     printi(minimum(42, 24));
     printi(maximum(42, 24));
     printi(minimum(24, 42));
