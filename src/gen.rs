@@ -32,6 +32,7 @@ use rlvm::{
     FunctionPassManager,
     IntPredicate,
     Module,
+    ModulePassManager,
     RealPredicate,
     RelocMode,
     Target,
@@ -51,6 +52,7 @@ use tast::{
     Expr,
     FuncDeclaration,
     TypedDeclaration,
+    TypedVar,
     Var,
 };
 use types::Type;
@@ -112,9 +114,10 @@ pub fn function(module: &Module, result_type: &Type, params: &[Type], name: Symb
 
 pub struct Gen {
     builder: Builder,
+    function_pass_manager: FunctionPassManager,
     inner_functions: Vec<FuncDeclaration>,
     module: Module,
-    pass_manager: FunctionPassManager,
+    module_pass_manager: ModulePassManager,
     target_machine: TargetMachine,
 }
 
@@ -128,18 +131,22 @@ impl Gen {
         module.set_data_layout(target_machine.create_data_layout());
         module.set_target(target_triple);
 
-        let pass_manager = FunctionPassManager::new_for_module(&module);
-        pass_manager.add_promote_memory_to_register_pass();
-        pass_manager.add_instruction_combining_pass();
-        pass_manager.add_reassociate_pass();
-        pass_manager.add_gvn_pass();
-        pass_manager.add_cfg_simplification_pass();
+        let module_pass_manager = ModulePassManager::new();
+        module_pass_manager.add_function_inlining_pass();
+
+        let function_pass_manager = FunctionPassManager::new_for_module(&module);
+        function_pass_manager.add_promote_memory_to_register_pass();
+        function_pass_manager.add_instruction_combining_pass();
+        function_pass_manager.add_reassociate_pass();
+        function_pass_manager.add_gvn_pass();
+        function_pass_manager.add_cfg_simplification_pass();
 
         Self {
             builder: Builder::new(),
+            function_pass_manager,
             inner_functions: Vec::new(),
             module,
-            pass_manager,
+            module_pass_manager,
             target_machine,
         }
     }
@@ -258,10 +265,7 @@ impl Gen {
                 Expr::Str { ref value } => {
                     self.builder.global_string_ptr(value, "string")
                 },
-                Expr::Variable(variable) => {
-                    let value = self.variable(variable.var);
-                    self.builder.load(to_llvm_type(&variable.typ), &value, "")
-                },
+                Expr::Variable(variable) => self.variable(variable),
                 _ => unimplemented!("{:?}", expr),
             };
         value
@@ -280,9 +284,11 @@ impl Gen {
         else {
             self.builder.ret(&return_value);
         }
-        function.llvm_function.verify(VerifierFailureAction::AbortProcess);
+        if function.llvm_function.verify(VerifierFailureAction::AbortProcess) {
+            function.llvm_function.dump();
+        }
 
-        self.pass_manager.run(&function.llvm_function);
+        self.function_pass_manager.run(&function.llvm_function);
     }
 
     pub fn generate(&mut self, declarations: Vec<TypedDeclaration>, filename: &str) -> PathBuf {
@@ -298,6 +304,7 @@ impl Gen {
             self.function_declaration(function);
         }
 
+        self.module_pass_manager.run(&self.module);
         self.module.dump();
 
         if let Err(error) = self.target_machine.emit_to_file(&self.module, object_output_path.as_os_str().to_str().expect("filename"), CodeGenFileType::ObjectFile) {
@@ -308,10 +315,11 @@ impl Gen {
         object_output_path
     }
 
-    fn variable(&self, variable: Var) -> Value {
-        match variable {
+    fn variable(&self, variable: TypedVar) -> Value {
+        match variable.var {
             Var::Field { .. } => unimplemented!(),
-            Var::Simple { value } => value,
+            Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
+            Var::Simple { value } => self.builder.load(to_llvm_type(&variable.typ), &value, ""),
             Var::Subscript { .. } => unimplemented!(),
         }
     }

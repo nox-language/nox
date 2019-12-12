@@ -22,6 +22,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use position::Pos;
+use self::Tok::*;
 
 #[derive(Clone, Debug)]
 pub enum Tok {
@@ -37,7 +38,6 @@ pub enum Tok {
     Do,
     Dot,
     Else,
-    End,
     Equal,
     For,
     Fun,
@@ -78,6 +78,53 @@ pub struct Token {
 
 impl Display for Tok {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "token")
+        let string = (|| {
+            let string = match *self {
+                Ampersand => "&",
+                Array => "array",
+                Break => "break",
+                CloseCurly => "}",
+                CloseParen => ")",
+                CloseSquare => "]",
+                Colon => ":",
+                ColonEqual => ":=",
+                Comma => ",",
+                Do => "do",
+                Dot => ".",
+                Else => "else",
+                Equal => "=",
+                For => "for",
+                Fun => "fun",
+                Greater => ">",
+                GreaterOrEqual => ">=",
+                Ident(ref ident) => ident,
+                If => "if",
+                In => "in",
+                Int(num) => return num.to_string(),
+                Lesser => "<",
+                LesserOrEqual => "<=",
+                Let => "let",
+                Minus => "-",
+                Nil => "nil",
+                NotEqual => "<>",
+                Of => "of",
+                OpenCurly => "{",
+                OpenParen => "(",
+                OpenSquare => "[",
+                Pipe => "|",
+                Plus => "+",
+                Semicolon => ";",
+                Slash => "/",
+                Star => "*",
+                Str(ref string) => string,
+                Then => "then",
+                To => "to",
+                Type => "type",
+                Var => "var",
+                While => "while",
+            };
+            string.to_string()
+        })();
+        write!(formatter, "{}", string)
     }
 }

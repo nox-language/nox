@@ -107,13 +107,15 @@ impl<'a> SemanticAnalyzer<'a> {
         node
     }
 
-    pub fn analyze(mut self, functions: Vec<FuncDeclarationWithPos>) -> Result<Vec<TypedDeclaration>> {
-        let mut declarations = vec![];
-        for function in functions {
-            declarations.push(self.trans_fun(function));
+    pub fn analyze(mut self, declarations: Vec<DeclarationWithPos>) -> Result<Vec<TypedDeclaration>> {
+        let mut result = vec![];
+        for declaration in declarations {
+            if let Some(declaration) = self.trans_dec(declaration) {
+                result.push(declaration);
+            }
         }
         if self.errors.is_empty() {
-            Ok(declarations)
+            Ok(result)
         }
         else {
             Err(Error::Multi(self.errors))
@@ -575,14 +577,24 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Var::Simple { ident } => {
-                if let Some(Entry::Var { typ, value }) = self.env.look_var(ident.node).cloned() { // TODO: remove this clone.
-                    return TypedVar {
-                        pos: var.pos,
-                        typ: self.actual_ty_var(&typ),
-                        var: tast::Var::Simple { value },
-                    };
+                match self.env.look_var(ident.node).cloned() { // TODO: remove this clone.
+                    Some(Entry::Var { typ, value }) => {
+                        return TypedVar {
+                            pos: var.pos,
+                            typ: self.actual_ty_var(&typ),
+                            var: tast::Var::Simple { value },
+                        };
+                    },
+                    Some(Entry::Fun { llvm_function, result, .. }) => {
+                        // TODO: check for no parameters?
+                        return TypedVar {
+                            pos: var.pos,
+                            typ: self.actual_ty_var(&result),
+                            var: tast::Var::Global { llvm_function },
+                        };
+                    },
+                    _ => self.undefined_variable(ident.node, var.pos),
                 }
-                self.undefined_variable(ident.node, var.pos)
             },
             Var::Subscript { expr, this } => {
                 let var = Box::new(self.trans_var(*this));

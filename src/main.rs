@@ -20,6 +20,7 @@
  */
 
 /*
+ * TODO: functions without parameters do not need parentheses?
  * TODO: error on missing a main function.
  * TODO: call exit in main (that requires writing an alternative runtime).
  */

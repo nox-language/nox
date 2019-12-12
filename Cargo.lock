@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 [[package]]
 name = "cc"
-version = "1.0.47"
+version = "1.0.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -15,11 +15,11 @@ dependencies = [
 [[package]]
 name = "rlvm"
 version = "0.0.2"
-source = "git+ssh://git@framagit.org/antoyo/rlvm.git#b7fc60b9f78f75829612c7d310e816413c8d541a"
+source = "git+ssh://git@framagit.org/antoyo/rlvm.git#502f5d028edbe8a0f4987a6dfbe60dcd29b3e270"
 dependencies = [
- "cc 1.0.47 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [metadata]
-"checksum cc 1.0.47 (registry+https://github.com/rust-lang/crates.io-index)" = "aa87058dce70a3ff5621797f1506cb837edd02ac4c0ae642b4542dce802908b8"
+"checksum cc 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)" = "f52a465a666ca3d838ebbf08b241383421412fe7ebb463527bba275526d89f76"
 "checksum rlvm 0.0.2 (git+ssh://git@framagit.org/antoyo/rlvm.git)" = "<none>"

@@ -21,7 +21,7 @@
 
 /*
  * Compile with:
- cargo run -- tests/hello.tig
+ cargo run -- tests/hello.nx
  * Assembly with:
  nasm -f elf64 tests/hello.s
  * Link with:

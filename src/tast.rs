@@ -132,6 +132,9 @@ pub enum Var {
         ident: SymbolWithPos,
         this: Box<TypedVar>,
     },
+    Global {
+        llvm_function: Function,
+    },
     Simple {
         value: Value,
     },

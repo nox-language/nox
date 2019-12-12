@@ -61,6 +61,18 @@ Think about uninitialized values (from malloc).
 No implicit free to avoid freeing uninitialized memory.
 Functions to work with uninitialized memory.
 
+=== Inline assembly
+
+For inline assembly, the same system with assumption seems to work:
+
+fun test
+    assume is_initialized(x) && x > 0
+    = (
+        let x;
+        inline asm …;
+        x
+    )
+
 == User-friendlyness
 
 === Less boilerplate
@@ -77,6 +89,8 @@ Maybe we don't need permissions. It could only be types:
 
 type &mut T = *T
 ensures is_unique(*T)
+
+Genericity for references to allow unwrap() to either return T or &T.
 
 === Freeing memory
 
@@ -103,3 +117,9 @@ Isn't it what the type inference do anyway?
 == Strings
 
 Use latin1?
+
+== Syntax
+
+Syntax genre int*l ptr pour les lifetimes? Regarder la syntax des noms de lock de Cyclone.
+
+Déréférencement de pointeur en suffixe genre ptr*.field avec probablement un autre caractère que * pour ne pas confondre avec la multiplication (pas sûr que ce soit possible si on a la surcharge d’opérateur, donc peut-être ptr.*.field comme Zig).

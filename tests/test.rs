@@ -54,8 +54,8 @@ fn test_execution() {
     for file in &files {
         println!("{}", file);
         let _ = remove_file(format!("./tests/{}", file));
-        Command::new("./target/debug/tiger")
-            .arg(&format!("tests/{}.tig", file))
+        Command::new("./target/debug/nox")
+            .arg(&format!("tests/{}.nx", file))
             .status()
             .expect("compile");
         let child = Command::new(format!("./tests/{}", file))
@@ -70,6 +70,6 @@ fn test_execution() {
         let read_size = child.stdout.expect("stdout").read_to_end(&mut buffer).expect("output");
         let output = &buffer[..read_size];
         let expected_output = fs::read(format!("./tests/{}.stdout", file)).expect("read");
-        assert_eq!(output, &*expected_output, "{}.tig", file);
+        assert_eq!(output, &*expected_output, "{}.nx", file);
     }
 }

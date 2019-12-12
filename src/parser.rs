@@ -209,7 +209,7 @@ impl<'a, R: Read> Parser<'a, R> {
                 Ok(WithPos::new(Declaration::Function(function), pos))
             },
             Type => self.ty_decs(),
-            Var => self.var_dec(),
+            Var => self.var_dec(false),
             _ => Err(self.unexpected_token("function, type or var")?),
         }
     }
@@ -661,7 +661,7 @@ impl<'a, R: Read> Parser<'a, R> {
         }
     }
 
-    fn var_dec(&mut self) -> Result<DeclarationWithPos> {
+    fn var_dec(&mut self, global: bool) -> Result<DeclarationWithPos> {
         let pos = eat!(self, Var);
         let var_name;
         eat!(self, Ident, var_name);
@@ -669,12 +669,22 @@ impl<'a, R: Read> Parser<'a, R> {
         let name = self.symbols.symbol(&var_name);
         eat!(self, ColonEqual);
         let init = self.expr()?;
-        Ok(WithPos::new(Variable {
-            escape: false,
-            init,
-            name,
-            typ,
-        }, pos))
+        if global {
+            Ok(WithPos::new(Declaration::Function(WithPos::new(FuncDeclaration {
+                body: init,
+                name,
+                params: vec![],
+                result: typ,
+            }, pos)), pos))
+        }
+        else {
+            Ok(WithPos::new(Variable {
+                escape: false,
+                init,
+                name,
+                typ,
+            }, pos))
+        }
     }
 
     fn while_loop(&mut self) -> Result<ExprWithPos> {
@@ -688,17 +698,28 @@ impl<'a, R: Read> Parser<'a, R> {
         }, pos))
     }
 
-    pub fn parse(&mut self) -> Result<Vec<FuncDeclarationWithPos>> {
-        let mut functions = vec![];
+    pub fn parse(&mut self) -> Result<Vec<DeclarationWithPos>> {
+        let mut declarations = vec![];
         loop {
             match self.peek_token() {
                 Err(Error::Eof) => break,
                 Err(error) => return Err(error.clone()),
-                Ok(_) => functions.push(self.fun_dec()?),
+                Ok(token) => {
+                    match token {
+                        Fun => {
+                            let function = self.fun_dec()?;
+                            let pos = function.pos;
+                            declarations.push(WithPos::new(Declaration::Function(function), pos))
+                        },
+                        Type => declarations.push(self.ty_decs()?),
+                        Var => declarations.push(self.var_dec(true)?),
+                        _ => return Err(self.unexpected_token("function, type or var")?),
+                    }
+                },
             }
         }
 
-        Ok(functions)
+        Ok(declarations)
     }
 
     fn peek(&mut self) -> result::Result<&Token, &Error> {
