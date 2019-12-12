@@ -1,5 +1,5 @@
-let var num := 42
-in (
+fun main() = (
+    let var num := 42;
     if num > 40 then
         print("num > 40\n")
     else
@@ -20,4 +20,3 @@ in (
     else
         print("num >= 42\n")
 )
-end

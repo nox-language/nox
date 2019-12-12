@@ -209,14 +209,20 @@ impl Gen {
                     let merge_basic_block = BasicBlock::append(&function, "ifcont");
                     self.builder.position_at_end(&merge_basic_block);
 
-                    let phi = self.builder.phi(types::int32(), "result");
-                    if let Some(else_value) = else_value {
-                        phi.add_incoming(&[(&then_value, &new_then_basic_block), (&else_value, &new_else_basic_block)]);
-
-                    }
-                    else {
-                        phi.add_incoming(&[(&then_value, &new_then_basic_block)]);
-                    }
+                    let result =
+                        match then.typ {
+                            Type::Unit => self.expr(Expr::Nil),
+                            _ => {
+                                let phi = self.builder.phi(to_llvm_type(&then.typ), "result");
+                                if let Some(else_value) = else_value {
+                                    phi.add_incoming(&[(&then_value, &new_then_basic_block), (&else_value, &new_else_basic_block)]);
+                                }
+                                else {
+                                    phi.add_incoming(&[(&then_value, &new_then_basic_block)]);
+                                }
+                                phi
+                            },
+                        };
 
                     self.builder.position_at_end(&start_basic_block);
                     self.builder.cond_br(&condition, &then_basic_block, &else_basic_block);
@@ -229,7 +235,7 @@ impl Gen {
 
                     self.builder.position_at_end(&merge_basic_block);
 
-                    phi
+                    result
                 },
                 Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
                 Expr::Let(declaration) => {
@@ -284,6 +290,7 @@ impl Gen {
         else {
             self.builder.ret(&return_value);
         }
+        println!("1");
         if function.llvm_function.verify(VerifierFailureAction::AbortProcess) {
             function.llvm_function.dump();
         }
@@ -304,6 +311,7 @@ impl Gen {
             self.function_declaration(function);
         }
 
+        println!("2");
         self.module_pass_manager.run(&self.module);
         self.module.dump();
 
