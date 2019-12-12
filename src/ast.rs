@@ -52,6 +52,7 @@ pub enum Expr {
         args: Vec<ExprWithPos>,
         function: Symbol,
     },
+    Decl(Box<DeclarationWithPos>),
     If {
         condition: Box<ExprWithPos>,
         else_: Option<Box<ExprWithPos>>,
@@ -60,7 +61,6 @@ pub enum Expr {
     Int {
         value: i64,
     },
-    Let(Box<DeclarationWithPos>),
     Nil,
     Oper {
         left: Box<ExprWithPos>,

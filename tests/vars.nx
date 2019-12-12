@@ -1,8 +1,8 @@
 var i: int := 0
 
 fun main() = (
-    let var j := 1;
-    let var k := 2;
+    var j := 1;
+    var k := 2;
     printi(i);
     printi(j);
     printi(k)

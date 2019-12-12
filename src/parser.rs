@@ -63,6 +63,8 @@ use symbol::{Symbols, SymbolWithPos};
 use token::{Tok, Token};
 use token::Tok::*;
 
+use self::Scope::{Global, Local};
+
 macro_rules! eat {
     ($_self:ident, $pat:ident, $var:ident) => {
         match $_self.token() {
@@ -109,6 +111,12 @@ macro_rules! fields {
             _ => $_self.fields()?,
         }
     };
+}
+
+#[derive(PartialEq)]
+enum Scope {
+    Global,
+    Local,
 }
 
 pub type Result<T> = result::Result<T, Error>;
@@ -198,19 +206,6 @@ impl<'a, R: Read> Parser<'a, R> {
                     self.lvalue_or_assign(var)
                 }
             }
-        }
-    }
-
-    fn dec(&mut self) -> Result<DeclarationWithPos> {
-        match self.peek()?.token {
-            Fun => {
-                let function = self.fun_dec()?;
-                let pos = function.pos;
-                Ok(WithPos::new(Declaration::Function(function), pos))
-            },
-            Type => self.ty_decs(),
-            Var => self.var_dec(false),
-            _ => Err(self.unexpected_token("function, type or var")?),
         }
     }
 
@@ -322,7 +317,7 @@ impl<'a, R: Read> Parser<'a, R> {
             };
 
         let declarations = Expr::Sequence(vec![
-            WithPos::dummy(Expr::Let(
+            WithPos::dummy(Expr::Decl(
                 Box::new(WithPos::dummy(Variable {
                     escape: false,
                     init: start,
@@ -330,7 +325,7 @@ impl<'a, R: Read> Parser<'a, R> {
                     typ: None,
                 }))
             )),
-            WithPos::dummy(Expr::Let(
+            WithPos::dummy(Expr::Decl(
                 Box::new(WithPos::dummy(Variable {
                     escape: false,
                     init: end,
@@ -363,6 +358,12 @@ impl<'a, R: Read> Parser<'a, R> {
         }, pos))
     }
 
+    fn fun_expr(&mut self) -> Result<ExprWithPos> {
+        let declaration = self.fun_dec()?;
+        let pos = declaration.pos;
+        Ok(WithPos::new(Expr::Decl(Box::new(WithPos::new(Declaration::Function(declaration), pos))), pos))
+    }
+
     fn if_then_else(&mut self) -> Result<ExprWithPos> {
         let pos = eat!(self, If);
         let condition = Box::new(self.expr()?);
@@ -391,10 +392,11 @@ impl<'a, R: Read> Parser<'a, R> {
         }, pos))
     }
 
-    fn let_expr(&mut self) -> Result<ExprWithPos> {
-        let pos = eat!(self, Let);
-        let declaration = self.dec()?;
-        Ok(WithPos::new(Expr::Let(Box::new(declaration)), pos))
+    // FIXME: var is not an expression.
+    fn var_expr(&mut self) -> Result<ExprWithPos> {
+        let declaration = self.var_dec(Local)?;
+        let pos = declaration.pos;
+        Ok(WithPos::new(Expr::Decl(Box::new(declaration)), pos))
     }
 
     fn logical_and_expr(&mut self) -> Result<ExprWithPos> {
@@ -517,13 +519,14 @@ impl<'a, R: Read> Parser<'a, R> {
         match self.peek()?.token {
             Break => self.break_(),
             For => self.for_loop(),
+            Fun => self.fun_expr(),
             If => self.if_then_else(),
             Ident(_) => self.call_expr_or_other(),
             Int(_) => self.int_lit(),
-            Let => self.let_expr(),
             Nil => self.nil(),
             OpenParen => self.seq_exp(),
             Str(_) => self.string_lit(),
+            Var => self.var_expr(),
             While => self.while_loop(),
             _ => Err(self.unexpected_token("break, for, if, identifier, integer literal, let, nil, (, string literal, while")?),
         }
@@ -661,7 +664,7 @@ impl<'a, R: Read> Parser<'a, R> {
         }
     }
 
-    fn var_dec(&mut self, global: bool) -> Result<DeclarationWithPos> {
+    fn var_dec(&mut self, scope: Scope) -> Result<DeclarationWithPos> {
         let pos = eat!(self, Var);
         let var_name;
         eat!(self, Ident, var_name);
@@ -669,21 +672,23 @@ impl<'a, R: Read> Parser<'a, R> {
         let name = self.symbols.symbol(&var_name);
         eat!(self, ColonEqual);
         let init = self.expr()?;
-        if global {
-            Ok(WithPos::new(Declaration::Function(WithPos::new(FuncDeclaration {
-                body: init,
-                name,
-                params: vec![],
-                result: typ,
-            }, pos)), pos))
-        }
-        else {
-            Ok(WithPos::new(Variable {
-                escape: false,
-                init,
-                name,
-                typ,
-            }, pos))
+        match scope {
+            Global => {
+                Ok(WithPos::new(Declaration::Function(WithPos::new(FuncDeclaration {
+                    body: init,
+                    name,
+                    params: vec![],
+                    result: typ,
+                }, pos)), pos))
+            },
+            Local => {
+                Ok(WithPos::new(Variable {
+                    escape: false,
+                    init,
+                    name,
+                    typ,
+                }, pos))
+            },
         }
     }
 
@@ -712,7 +717,7 @@ impl<'a, R: Read> Parser<'a, R> {
                             declarations.push(WithPos::new(Declaration::Function(function), pos))
                         },
                         Type => declarations.push(self.ty_decs()?),
-                        Var => declarations.push(self.var_dec(true)?),
+                        Var => declarations.push(self.var_dec(Global)?),
                         _ => return Err(self.unexpected_token("function, type or var")?),
                     }
                 },

@@ -1,5 +1,5 @@
 /* Hello-world with function */
 fun main() = (
-    let fun hello() = print("Hello, World!\n");
+    fun hello() = print("Hello, World!\n");
     hello()
 )

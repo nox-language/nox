@@ -60,6 +60,7 @@ pub enum Expr {
         args: Vec<TypedExpr>,
         llvm_function: Function,
     },
+    Decl(Box<TypedDeclaration>),
     If {
         condition: Box<TypedExpr>,
         else_: Option<Box<TypedExpr>>,
@@ -68,7 +69,6 @@ pub enum Expr {
     Int {
         value: i64,
     },
-    Let(Box<TypedDeclaration>),
     Nil,
     Oper {
         left: Box<TypedExpr>,

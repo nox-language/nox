@@ -238,7 +238,7 @@ impl Gen {
                     result
                 },
                 Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
-                Expr::Let(declaration) => {
+                Expr::Decl(declaration) => {
                     self.declaration(*declaration, true);
                     self.expr(Expr::Nil)
                 },
@@ -290,7 +290,6 @@ impl Gen {
         else {
             self.builder.ret(&return_value);
         }
-        println!("1");
         if function.llvm_function.verify(VerifierFailureAction::AbortProcess) {
             function.llvm_function.dump();
         }
@@ -311,7 +310,6 @@ impl Gen {
             self.function_declaration(function);
         }
 
-        println!("2");
         self.module_pass_manager.run(&self.module);
         self.module.dump();
 

@@ -339,14 +339,14 @@ impl<'a> SemanticAnalyzer<'a> {
                     pos: expr.pos,
                     typ: Type::Int,
                 },
-            Expr::Let(declaration) => {
+            Expr::Decl(declaration) => {
                 let old_in_loop = self.in_loop;
                 // TODO: why set in_loop to false here?
                 self.in_loop = false;
                 let declaration = self.trans_dec(*declaration);
                 self.in_loop = old_in_loop;
                 TypedExpr {
-                    expr: tast::Expr::Let(Box::new(declaration.expect("declaration"))), // TODO: handle error.
+                    expr: tast::Expr::Decl(Box::new(declaration.expect("declaration"))), // TODO: handle error.
                     pos: expr.pos,
                     typ: Type::Unit,
                 }
