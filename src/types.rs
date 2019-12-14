@@ -26,6 +26,7 @@ use symbol::{Symbol, SymbolWithPos};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
+    Bool,
     Int,
     String,
     Record(Symbol, Vec<(Symbol, Type)>, Unique),
@@ -40,6 +41,7 @@ impl Display for Type {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         let string =
             match *self {
+                Bool => "bool".to_string(),
                 Int => "int".to_string(),
                 String => "string".to_string(),
                 Record(_, ref types, _) => {

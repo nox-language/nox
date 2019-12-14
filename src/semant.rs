@@ -151,6 +151,16 @@ impl<'a> SemanticAnalyzer<'a> {
         }
     }
 
+    fn check_bool(&mut self, expr: &TypedExpr, pos: Pos) {
+        if expr.typ != Type::Bool && expr.typ != Type::Error {
+            return self.add_error(Error::Type {
+                expected: Type::Bool,
+                pos,
+                unexpected: expr.typ.clone(),
+            }, ());
+        }
+    }
+
     fn check_duplicate_types(&mut self, typ: &TypeDecWithPos) {
         let mut names = HashSet::new();
         // TODO: what is this doing? Checking that the type name is different than the right-hand
@@ -278,6 +288,12 @@ impl<'a> SemanticAnalyzer<'a> {
                     typ: Type::Unit,
                 }
             },
+            Expr::Bool(value) =>
+                TypedExpr {
+                    expr: tast::Expr::Bool(value),
+                    pos: expr.pos,
+                    typ: Type::Bool,
+                },
             Expr::Break => {
                 if !self.in_loop {
                     return self.add_error(Error::BreakOutsideLoop {
@@ -313,7 +329,7 @@ impl<'a> SemanticAnalyzer<'a> {
             },
             Expr::If { else_, condition, then } => {
                 let condition = Box::new(self.trans_exp(*condition));
-                self.check_int(&condition, then.pos);
+                self.check_bool(&condition, then.pos);
                 let if_expr = Box::new(self.trans_exp(*then));
                 let (else_, typ) =
                     match else_ {
@@ -377,7 +393,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 TypedExpr {
                     expr: tast::Expr::Oper { left, oper: oper.clone(), right },
                     pos: expr.pos,
-                    typ: Type::Int,
+                    typ: Type::Bool,
                 }
             },
             Expr::Record { mut fields, typ } => {
@@ -447,13 +463,21 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Expr::While { body, condition } => {
-                let condition_expr = self.trans_exp(*condition);
-                self.check_int(&condition_expr, condition_expr.pos);
+                let condition = Box::new(self.trans_exp(*condition));
+                self.check_bool(&condition, condition.pos);
                 let old_in_loop = self.in_loop;
                 self.in_loop = true;
-                let result = self.trans_exp(*body);
+                let body = Box::new(self.trans_exp(*body));
                 self.in_loop = old_in_loop;
-                result
+                let pos = body.pos;
+                TypedExpr {
+                    expr: tast::Expr::While {
+                        body,
+                        condition,
+                    },
+                    pos,
+                    typ: Type::Unit,
+                }
             },
         }
     }

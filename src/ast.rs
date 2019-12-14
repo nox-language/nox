@@ -47,6 +47,7 @@ pub enum Expr {
         expr: Box<ExprWithPos>,
         var: VarWithPos,
     },
+    Bool(bool),
     Break,
     Call {
         args: Vec<ExprWithPos>,

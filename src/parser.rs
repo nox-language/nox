@@ -167,6 +167,11 @@ impl<'a, R: Read> Parser<'a, R> {
         }, pos))
     }
 
+    fn boolean(&mut self, value: bool) -> Result<ExprWithPos> {
+        let pos = self.token()?.start;
+        Ok(WithPos::new(Expr::Bool(value), pos))
+    }
+
     fn break_(&mut self) -> Result<ExprWithPos> {
         let pos = eat!(self, Break);
         Ok(WithPos::new(Expr::Break, pos))
@@ -518,6 +523,7 @@ impl<'a, R: Read> Parser<'a, R> {
     fn primary_expr(&mut self) -> Result<ExprWithPos> {
         match self.peek()?.token {
             Break => self.break_(),
+            False => self.boolean(false),
             For => self.for_loop(),
             Fun => self.fun_expr(),
             If => self.if_then_else(),
@@ -526,6 +532,7 @@ impl<'a, R: Read> Parser<'a, R> {
             Nil => self.nil(),
             OpenParen => self.seq_exp(),
             Str(_) => self.string_lit(),
+            True => self.boolean(true),
             Var => self.var_expr(),
             While => self.while_loop(),
             _ => Err(self.unexpected_token("break, for, if, identifier, integer literal, let, nil, (, string literal, while")?),

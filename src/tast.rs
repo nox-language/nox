@@ -55,6 +55,7 @@ pub enum Expr {
         expr: Box<TypedExpr>,
         var: TypedVar,
     },
+    Bool(bool),
     Break,
     Call {
         args: Vec<TypedExpr>,

@@ -52,7 +52,6 @@ use tast::{
     Expr,
     FuncDeclaration,
     TypedDeclaration,
-    TypedVar,
     Var,
 };
 use types::Type;
@@ -83,6 +82,7 @@ fn to_real_rel_op(op: Operator) -> RealPredicate {
 
 pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
     match *typ {
+        Type::Bool => types::integer::int1(),
         Type::Int => types::integer::int32(), // TODO: int64?
         Type::String => types::pointer::new(types::int8(), 0),
         Type::Record(_symbol, ref _fields, _) => unimplemented!(),
@@ -113,6 +113,7 @@ pub fn function(module: &Module, result_type: &Type, params: &[Type], name: Symb
 }
 
 pub struct Gen {
+    break_label: Option<BasicBlock>,
     builder: Builder,
     function_pass_manager: FunctionPassManager,
     inner_functions: Vec<FuncDeclaration>,
@@ -142,6 +143,7 @@ impl Gen {
         function_pass_manager.add_cfg_simplification_pass();
 
         Self {
+            break_label: None,
             builder: Builder::new(),
             function_pass_manager,
             inner_functions: Vec::new(),
@@ -179,6 +181,29 @@ impl Gen {
     fn expr(&mut self, expr: Expr) -> Value {
         let value =
             match expr {
+                Expr::Assign { expr, var } => {
+                    let value = self.expr(expr.expr);
+                    let variable =
+                        match var.var {
+                            Var::Field { .. } => unimplemented!(),
+                            Var::Global { .. } => unreachable!(),
+                            Var::Simple { value } => value,
+                            Var::Subscript { .. } => unimplemented!(),
+                        };
+                    self.builder.store(&value, &variable)
+                },
+                Expr::Bool(value) => {
+                    constant::int(types::int1(), value as u64, true)
+                },
+                Expr::Break => {
+                    let label = self.break_label.clone().expect("break label");
+                    let val = self.builder.br(&label);
+                    let start_basic_block = self.builder.get_insert_block().expect("start basic block");
+                    let function = start_basic_block.get_parent();
+                    let basic_block = BasicBlock::append(&function, "afterbreak");
+                    self.builder.position_at_end(&basic_block);
+                    val
+                },
                 Expr::Call { args, llvm_function } => {
                     let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(arg.expr)).collect();
                     self.builder.call(llvm_function.clone(), &arguments, "")
@@ -271,7 +296,42 @@ impl Gen {
                 Expr::Str { ref value } => {
                     self.builder.global_string_ptr(value, "string")
                 },
-                Expr::Variable(variable) => self.variable(variable),
+                Expr::Variable(variable) => {
+                    let typ = to_llvm_type(&variable.typ);
+                    match variable.var {
+                        Var::Field { .. } => unimplemented!(),
+                        Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
+                        Var::Simple { value } => self.builder.load(typ, &value, ""),
+                        Var::Subscript { .. } => unimplemented!(),
+                    }
+                },
+                Expr::While { body, condition } => {
+                    let start_basic_block = self.builder.get_insert_block().expect("start basic block");
+                    let function = start_basic_block.get_parent();
+
+                    let start_loop_basic_block = BasicBlock::append(&function, "startloop");
+                    self.builder.br(&start_loop_basic_block);
+                    self.builder.position_at_end(&start_loop_basic_block);
+
+                    let condition = self.expr(condition.expr);
+                    let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "whilecond");
+
+                    let loop_basic_block = BasicBlock::append(&function, "loop");
+                    let after_basic_block = BasicBlock::append(&function, "afterloop");
+                    self.break_label = Some(after_basic_block.clone());
+                    self.builder.cond_br(&condition, &loop_basic_block, &after_basic_block);
+
+                    self.builder.position_at_end(&loop_basic_block);
+
+                    let previous_break_label = self.break_label.clone();
+                    self.expr(body.expr);
+                    self.break_label = previous_break_label;
+                    self.builder.br(&start_loop_basic_block);
+
+                    self.builder.position_at_end(&after_basic_block);
+
+                    constant::null(types::int32())
+                },
                 _ => unimplemented!("{:?}", expr),
             };
         value
@@ -319,14 +379,5 @@ impl Gen {
         }
 
         object_output_path
-    }
-
-    fn variable(&self, variable: TypedVar) -> Value {
-        match variable.var {
-            Var::Field { .. } => unimplemented!(),
-            Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
-            Var::Simple { value } => self.builder.load(to_llvm_type(&variable.typ), &value, ""),
-            Var::Subscript { .. } => unimplemented!(),
-        }
     }
 }
