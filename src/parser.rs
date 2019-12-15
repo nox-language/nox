@@ -315,9 +315,7 @@ impl<'a, R: Read> Parser<'a, R> {
                                     })),
                             }),
                         ]))),
-                        condition: Box::new(WithPos::dummy(Expr::Int {
-                            value: 1,
-                        })),
+                        condition: Box::new(WithPos::dummy(Expr::Bool(true))),
                     })),
             };
 
