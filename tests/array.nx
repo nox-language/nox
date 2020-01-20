@@ -6,10 +6,10 @@ fun main() = (
     printi(value);
     var value := b[0];
     printi(value);
-    a[0] := 10
-    /*printi(a[0]);
+    a[0] := 10;
+    printi(a[0]);
     for i := 0 to len - 1 do
         a[i] := i;
     for i := 0 to len - 1 do
-        printi(a[i])*/
+        printi(a[i])
 )

@@ -209,8 +209,10 @@ impl Gen {
                             Var::Global { .. } => unreachable!(),
                             Var::Simple { value } => value,
                             Var::Subscript { expr, this } => {
-                                let expr = self.expr(expr);
-                                self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), expr, true), index], "index")
+                                let index = self.expr(expr.expr);
+                                let llvm_type = to_llvm_type(&this.typ);
+                                let this = self.variable_address(*this);
+                                self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
                             },
                         };
                     self.builder.store(&value, &variable)
@@ -302,7 +304,7 @@ impl Gen {
                         Operator::Gt => self.builder.icmp(IntPredicate::SignedGreaterThan, &left, &right, "cmptmp"),
                         Operator::Le => self.builder.icmp(IntPredicate::SignedLesserThanOrEqual, &left, &right, "cmptmp"),
                         Operator::Lt => self.builder.icmp(IntPredicate::SignedLesserThan, &left, &right, "cmptmp"),
-                        Operator::Minus => unimplemented!(),
+                        Operator::Minus => self.builder.sub(&left, &right, "diff"),
                         Operator::Neq => self.builder.icmp(IntPredicate::NotEqual, &left, &right, "cmptmp"),
                         Operator::Or => unimplemented!(),
                         Operator::Plus => self.builder.add(&left, &right, "sum"),
