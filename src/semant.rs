@@ -241,6 +241,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 else if init.typ == Type::Nil {
                     return self.add_error(Error::RecordType { pos: declaration.pos }, None);
                 }
+                println!("Name {}: {:?}", name, init.typ);
                 let value = gen::create_entry_block_alloca(&self.current_function(), &self.symbol(name), &init.typ);
                 self.env.enter_var(name, Entry::Var { typ: init.typ.clone(), value: value.clone() });
                 Some(WithPos::new(tast::Declaration::Variable {
@@ -256,25 +257,12 @@ impl<'a> SemanticAnalyzer<'a> {
 
     pub fn trans_exp(&mut self, expr: ExprWithPos) -> TypedExpr {
         match expr.node {
-            Expr::Array { init, size, typ } => {
-                let size_expr = self.trans_exp(*size);
-                self.check_int(&size_expr, size_expr.pos);
-                let ty = self.get_type(&typ, AddError);
+            Expr::Array { init, size } => {
                 let init_expr = self.trans_exp(*init);
-                match ty {
-                    Type::Array(ref typ, _) =>
-                        self.check_types(typ, &init_expr.typ, init_expr.pos),
-                    Type::Error => (),
-                    _ =>
-                        return self.add_error(Error::UnexpectedType {
-                            kind: "array".to_string(),
-                            pos: typ.pos,
-                        }, exp_type_error()),
-                }
                 TypedExpr {
-                    expr: tast::Expr::Array { init: Box::new(init_expr), size: Box::new(size_expr), typ: typ.clone() },
+                    typ: Type::Array(Box::new(init_expr.typ.clone()), size, Unique::new()),
+                    expr: tast::Expr::Array { init: Box::new(init_expr), size },
                     pos: expr.pos,
-                    typ: ty,
                 }
             },
             Expr::Assign { expr, var } => {
@@ -557,9 +545,9 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn trans_ty(&mut self, symbol: Symbol, ty: &TyWithPos) -> Type {
         match ty.node {
-            Ty::Array { ref ident } => {
+            Ty::Array { ref ident, size } => {
                 let ty = self.get_type(ident, AddError);
-                Type::Array(Box::new(ty), Unique::new())
+                Type::Array(Box::new(ty), size, Unique::new())
             },
             Ty::Name { ref ident } => self.get_type(ident, AddError),
             Ty::Record { ref fields } => {
@@ -625,7 +613,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 let subscript_expr = Box::new(self.trans_exp(*expr));
                 self.check_int(&subscript_expr, subscript_expr.pos);
                 match var.typ.clone() {
-                    Type::Array(typ, _) => TypedVar {
+                    Type::Array(typ, _, _) => TypedVar {
                         typ: self.actual_ty_var(&typ),
                         pos: var.pos,
                         var: tast::Var::Subscript { expr: subscript_expr, this: var },

@@ -156,6 +156,19 @@ impl<'a, R: Read> Parser<'a, R> {
         Ok(expr)
     }
 
+    fn array(&mut self) -> Result<ExprWithPos> {
+        let pos = eat!(self, OpenSquare);
+        let init = Box::new(self.expr()?);
+        eat!(self, Semicolon);
+        let size;
+        eat!(self, Int, size);
+        eat!(self, CloseSquare);
+        Ok(WithPos::new(Expr::Array {
+            init,
+            size: size as usize,
+        }, pos))
+    }
+
     fn arr_ty(&mut self) -> Result<TyWithPos> {
         let pos = eat!(self, Array);
         eat!(self, Of);
@@ -164,6 +177,7 @@ impl<'a, R: Read> Parser<'a, R> {
         let ident = self.symbols.symbol(&type_name);
         Ok(WithPos::new(Ty::Array {
             ident: WithPos::new(ident, type_pos),
+            size: 0, // TODO
         }, pos))
     }
 
@@ -442,42 +456,18 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn lvalue_or_assign(&mut self, var: VarWithPos) -> Result<ExprWithPos> {
         let var = self.lvalue(var)?;
-        let value =
-            if let Of = self.peek()?.token {
-                match var.node {
-                    Var::Subscript { expr, this } => {
-                        let pos = this.pos;
-                        if let Var::Simple { ident } = this.node {
-                            eat!(self, Of);
-                            let init = Box::new(self.expr()?);
-                            return Ok(WithPos::new(Expr::Array {
-                                init,
-                                size: expr,
-                                typ: WithPos::new(ident.node, pos),
-                            }, pos));
-                        }
-                        else {
-                            return Err(self.unexpected_token("neither dot nor subscript")?);
-                        }
-                    },
-                    _ => return Err(self.unexpected_token(":= or (nothing)")?),
-                }
-            }
-            else {
-                var
-            };
         if let ColonEqual = self.peek()?.token {
             eat!(self, ColonEqual);
             let expr = Box::new(self.expr()?);
             let pos = expr.pos;
             Ok(WithPos::new(Expr::Assign {
                 expr,
-                var: value,
+                var,
             }, pos))
         }
         else {
-            let pos = value.pos;
-            Ok(WithPos::new(Expr::Variable(value), pos))
+            let pos = var.pos;
+            Ok(WithPos::new(Expr::Variable(var), pos))
         }
     }
 
@@ -529,11 +519,12 @@ impl<'a, R: Read> Parser<'a, R> {
             Int(_) => self.int_lit(),
             Nil => self.nil(),
             OpenParen => self.seq_exp(),
+            OpenSquare => self.array(),
             Str(_) => self.string_lit(),
             True => self.boolean(true),
             Var => self.var_expr(),
             While => self.while_loop(),
-            _ => Err(self.unexpected_token("break, for, if, identifier, integer literal, let, nil, (, string literal, while")?),
+            _ => Err(self.unexpected_token("break, false, for, fun, if, identifier, integer literal, nil, (, string literal, true, var, while")?),
         }
     }
 

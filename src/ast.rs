@@ -40,8 +40,7 @@ pub type DeclarationWithPos = WithPos<Declaration>;
 pub enum Expr {
     Array {
         init: Box<ExprWithPos>,
-        size: Box<ExprWithPos>,
-        typ: SymbolWithPos,
+        size: usize,
     },
     Assign {
         expr: Box<ExprWithPos>,
@@ -134,6 +133,7 @@ pub type RecordFieldWithPos = WithPos<RecordField>;
 pub enum Ty {
     Array {
         ident: SymbolWithPos,
+        size: usize,
     },
     Name {
         ident: SymbolWithPos,

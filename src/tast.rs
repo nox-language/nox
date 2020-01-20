@@ -48,8 +48,7 @@ pub type TypedDeclaration = WithPos<Declaration>;
 pub enum Expr {
     Array {
         init: Box<TypedExpr>,
-        size: Box<TypedExpr>,
-        typ: SymbolWithPos,
+        size: usize,
     },
     Assign {
         expr: Box<TypedExpr>,

@@ -52,6 +52,7 @@ use tast::{
     Expr,
     FuncDeclaration,
     TypedDeclaration,
+    TypedVar,
     Var,
 };
 use types::Type;
@@ -86,7 +87,7 @@ pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
         Type::Int => types::integer::int32(), // TODO: int64?
         Type::String => types::pointer::new(types::int8(), 0),
         Type::Record(_symbol, ref _fields, _) => unimplemented!(),
-        Type::Array(ref _type, _) => unimplemented!(),
+        Type::Array(ref typ, size, _) => types::array::array(to_llvm_type(typ), size),
         Type::Nil => types::integer::int32(), // TODO: int64 or pointer type?
         Type::Unit => types::void(),
         Type::Name(ref _symbol, ref _type) => unimplemented!(),
@@ -171,8 +172,21 @@ impl Gen {
                 }
             },
             Declaration::Variable { init, value, .. } => {
+                println!("Var type: {:?}", init.typ);
+                println!("Init expr: {:?}", init.expr);
                 let init_value = self.expr(init.expr);
-                self.builder.store(&init_value, &value);
+                if let Type::Array(ref typ, size, _) = init.typ {
+                    let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
+                    self.builder.mem_move(&value, align_of(&init.typ), &init_value, align_of(&init.typ), &size);
+                }
+                else {
+                    println!("Init:");
+                    init_value.get_type().dump();
+                    println!("\nPointer:");
+                    value.get_type().dump();
+                    println!();
+                    self.builder.store(&init_value, &value);
+                }
             },
             _ => unimplemented!(),
         }
@@ -181,6 +195,12 @@ impl Gen {
     fn expr(&mut self, expr: Expr) -> Value {
         let value =
             match expr {
+                Expr::Array { init, size } => {
+                    let typ = types::array::array(to_llvm_type(&init.typ), size);
+                    // TODO: set the initial value of the array with a loop.
+                    let array = self.builder.alloca(typ, "array");
+                    array
+                },
                 Expr::Assign { expr, var } => {
                     let value = self.expr(expr.expr);
                     let variable =
@@ -188,7 +208,10 @@ impl Gen {
                             Var::Field { .. } => unimplemented!(),
                             Var::Global { .. } => unreachable!(),
                             Var::Simple { value } => value,
-                            Var::Subscript { .. } => unimplemented!(),
+                            Var::Subscript { expr, this } => {
+                                let expr = self.expr(expr);
+                                self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), expr, true), index], "index")
+                            },
                         };
                     self.builder.store(&value, &variable)
                 },
@@ -296,15 +319,7 @@ impl Gen {
                 Expr::Str { ref value } => {
                     self.builder.global_string_ptr(value, "string")
                 },
-                Expr::Variable(variable) => {
-                    let typ = to_llvm_type(&variable.typ);
-                    match variable.var {
-                        Var::Field { .. } => unimplemented!(),
-                        Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
-                        Var::Simple { value } => self.builder.load(typ, &value, ""),
-                        Var::Subscript { .. } => unimplemented!(),
-                    }
-                },
+                Expr::Variable(variable) => self.variable(variable),
                 Expr::While { body, condition } => {
                     let start_basic_block = self.builder.get_insert_block().expect("start basic block");
                     let function = start_basic_block.get_parent();
@@ -379,5 +394,56 @@ impl Gen {
         }
 
         object_output_path
+    }
+
+    fn variable(&mut self, variable: TypedVar) -> Value {
+        let typ = to_llvm_type(&variable.typ);
+        match variable.var {
+            Var::Field { .. } => unimplemented!(),
+            Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
+            Var::Simple { value } => self.builder.load(typ, &value, ""),
+            Var::Subscript { this, expr } => {
+                println!("Var: {:?}", variable.typ);
+                println!("This: {:?}", this);
+                println!("Expr: {:?}", expr.typ);
+                let llvm_type = to_llvm_type(&this.typ);
+                let this = self.variable_address(*this);
+                let index = self.expr(expr.expr);
+                println!("gep type:");
+                llvm_type.dump();
+                println!();
+                let pointer = self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index");
+                self.builder.load(typ, &pointer, "")
+            },
+        }
+    }
+
+    fn variable_address(&mut self, variable: TypedVar) -> Value {
+        match variable.var {
+            Var::Field { .. } => unimplemented!(),
+            Var::Global { .. } => unimplemented!(),
+            Var::Simple { value } => value,
+            Var::Subscript { this, expr } => {
+                let llvm_type = to_llvm_type(&variable.typ);
+                let this = self.variable_address(*this);
+                let index = self.expr(expr.expr);
+                self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
+            },
+        }
+    }
+}
+
+fn align_of(typ: &Type) -> usize {
+    match *typ {
+        Type::Array(ref typ, _, _) => size_of(typ),
+        Type::Int => size_of(typ),
+        _ => unimplemented!("align_of {:?}", typ),
+    }
+}
+
+fn size_of(typ: &Type) -> usize {
+    match *typ {
+        Type::Int => 8,
+        _ => unimplemented!("size_of {:?}", typ),
     }
 }
