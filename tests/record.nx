@@ -1,12 +1,13 @@
-let type Point = {
-        x: int,
-        y: int
-    }
+type Point = {
+    x: int,
+    y: int
+}
+
+fun main() = (
     var point := Point {
         x = 42,
         y = 24
-    }
-in (
+    };
     printi(point.x);
     printi(point.y);
     point.y := 100;
@@ -16,4 +17,3 @@ in (
     printi(point.x);
     printi(point.y)
 )
-end

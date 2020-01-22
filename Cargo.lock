@@ -9,17 +9,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "nox"
 version = "0.1.0"
 dependencies = [
- "rlvm 0.0.2 (git+ssh://git@framagit.org/antoyo/rlvm.git)",
+ "rlvm 0.0.2",
 ]
 
 [[package]]
 name = "rlvm"
 version = "0.0.2"
-source = "git+ssh://git@framagit.org/antoyo/rlvm.git#e1df08f159a2da4d724a261ddc8f658518807439"
 dependencies = [
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [metadata]
 "checksum cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)" = "95e28fa049fda1c330bcf9d723be7663a899c4679724b34c81e9f5a326aab8cd"
-"checksum rlvm 0.0.2 (git+ssh://git@framagit.org/antoyo/rlvm.git)" = "<none>"

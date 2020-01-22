@@ -228,7 +228,8 @@ impl<'a> SemanticAnalyzer<'a> {
                 self.check_duplicate_types(&type_declaration);
                 let name = &type_declaration.node.name;
                 let new_type = self.trans_ty(name.node, &type_declaration.node.ty);
-                self.env.enter_type(name.node, Type::Name(name.clone(), Box::new(new_type)));
+                println!("New type: {:?}", new_type);
+                self.env.enter_type(name.node, new_type);
 
                 Some(WithPos::new(tast::Declaration::Type(type_declaration), declaration.pos))
             },
@@ -392,6 +393,7 @@ impl<'a> SemanticAnalyzer<'a> {
             },
             Expr::Record { mut fields, typ } => {
                 let ty = self.get_type(&typ, AddError);
+                println!("{:?}", ty);
                 let mut field_exprs = vec![];
                 match ty {
                     Type::Record(_, ref type_fields, _) => {

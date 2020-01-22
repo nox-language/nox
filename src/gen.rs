@@ -46,12 +46,14 @@ use rlvm::{
 };
 
 use ast::Operator;
+use position::Pos;
 use symbol::{Strings, Symbol};
 use tast::{
     Declaration,
     Expr,
     FuncDeclaration,
     TypedDeclaration,
+    TypedExpr,
     TypedVar,
     Var,
 };
@@ -86,7 +88,10 @@ pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
         Type::Bool => types::integer::int1(),
         Type::Int32 => types::integer::int32(), // TODO: int64?
         Type::String => types::pointer::new(types::int8(), 0),
-        Type::Record(_symbol, ref _fields, _) => unimplemented!(),
+        Type::Record(_symbol, ref fields, _) => {
+            let types: Vec<_> = fields.iter().map(|(_symbol, typ)| to_llvm_type(typ)).collect();
+            types::structure::new(&types, false)
+        },
         Type::Array(ref typ, size) => types::array::array(to_llvm_type(typ), size),
         Type::Nil => types::integer::int32(), // TODO: int64 or pointer type?
         Type::Unit => types::void(),
@@ -171,50 +176,60 @@ impl Gen {
                     self.function_declaration(function.node);
                 }
             },
+            Declaration::Type { .. } => (), // TODO: should we generate a llvm type declaration?
             Declaration::Variable { init, value, .. } => {
-                let init_value = self.expr(init.expr);
                 if let Type::Array(ref typ, size) = init.typ {
                     let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
-                    self.builder.mem_move(&value, align_of(&init.typ), &init_value, align_of(&init.typ), &size);
+                    let align = align_of(&init.typ);
+                    let init_value = self.expr(init);
+                    self.builder.mem_move(&value, align, &init_value, align, &size);
                 }
                 else {
+                    let init_value = self.expr(init);
                     self.builder.store(&init_value, &value);
                 }
             },
-            _ => unimplemented!(),
         }
     }
 
-    fn expr(&mut self, expr: Expr) -> Value {
+    fn expr(&mut self, expr: TypedExpr) -> Value {
         let value =
-            match expr {
+            match expr.expr {
                 Expr::Array { init, size } => {
                     let typ = types::array::array(to_llvm_type(&init.typ), size);
-                    // TODO: set the initial value of the array with a loop.
-                    let array = self.builder.alloca(typ, "array");
-                    array
+                    self.builder.alloca(typ, "array")
                 },
                 Expr::Assign { expr, var } => {
-                    let value = self.expr(expr.expr);
-                    let variable =
-                        match var.var {
-                            Var::Field { .. } => unimplemented!(),
-                            Var::Global { .. } => unreachable!(),
-                            Var::Simple { value } => value,
-                            Var::Subscript { expr, this } => {
-                                let index = self.expr(expr.expr);
-                                let llvm_type = to_llvm_type(&this.typ);
-                                let this = self.variable_address(*this);
-                                self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
-                            },
-                        };
-                        if let Type::Array(ref typ, size) = expr.typ {
-                            let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
-                            self.builder.mem_move(&variable, align_of(&expr.typ), &value, align_of(&expr.typ), &size)
-                        }
-                        else {
-                            self.builder.store(&value, &variable)
-                        }
+                    if let Type::Array(ref typ, size) = expr.typ {
+                        let size_of = size_of(typ);
+                        let align = align_of(&expr.typ);
+                        let value = self.expr(*expr);
+                        let variable =
+                            match var.var {
+                                Var::Field { .. } => unreachable!(),
+                                Var::Global { .. } => unreachable!(),
+                                Var::Simple { .. } => unreachable!(),
+                                Var::Subscript { expr, this } => {
+                                    let index = self.expr(*expr);
+                                    let llvm_type = to_llvm_type(&this.typ);
+                                    let this = self.variable_address(*this);
+                                    self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
+                                },
+                            };
+                        let size = constant::int(types::int32(), (size_of * size) as u64, true);
+                        self.builder.mem_move(&variable, align, &value, align, &size)
+                    }
+                    else {
+                        let value = self.expr(*expr);
+                        let variable =
+                            match var.var {
+                                Var::Field { .. } => unimplemented!(),
+                                Var::Global { .. } => unreachable!(),
+                                Var::Simple { value } => value,
+                                Var::Subscript { .. } => unreachable!(),
+                            };
+                        self.builder.store(&value, &variable)
+                    }
                 },
                 Expr::Bool(value) => {
                     constant::int(types::int1(), value as u64, true)
@@ -229,11 +244,11 @@ impl Gen {
                     val
                 },
                 Expr::Call { args, llvm_function } => {
-                    let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(arg.expr)).collect();
+                    let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(arg)).collect();
                     self.builder.call(llvm_function.clone(), &arguments, "")
                 },
                 Expr::If { condition, then, else_ } => {
-                    let condition = self.expr(condition.expr);
+                    let condition = self.expr(*condition);
                     let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "ifcond");
 
                     let start_basic_block = self.builder.get_insert_block().expect("start basic block");
@@ -244,14 +259,13 @@ impl Gen {
 
                     self.builder.position_at_end(&then_basic_block);
 
-                    let then_value = self.expr(then.expr);
 
                     let new_then_basic_block = self.builder.get_insert_block().expect("new then basic block");
 
                     let else_basic_block = BasicBlock::append(&function, "else");
                     self.builder.position_at_end(&else_basic_block);
 
-                    let else_value = else_.map(|else_| self.expr(else_.expr));
+                    let else_value = else_.map(|else_| self.expr(*else_));
 
                     let new_else_basic_block = self.builder.get_insert_block().expect("new else basic block");
 
@@ -260,9 +274,10 @@ impl Gen {
 
                     let result =
                         match then.typ {
-                            Type::Unit => self.expr(Expr::Nil),
+                            Type::Unit => self.expr(dummy_nil()),
                             _ => {
                                 let phi = self.builder.phi(to_llvm_type(&then.typ), "result");
+                                let then_value = self.expr(*then);
                                 if let Some(else_value) = else_value {
                                     phi.add_incoming(&[(&then_value, &new_then_basic_block), (&else_value, &new_else_basic_block)]);
                                 }
@@ -289,12 +304,12 @@ impl Gen {
                 Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
                 Expr::Decl(declaration) => {
                     self.declaration(*declaration, true);
-                    self.expr(Expr::Nil)
+                    self.expr(dummy_nil())
                 },
                 Expr::Nil => constant::int(types::integer::int32(), 0, true), // TODO: use pointer type?
                 Expr::Oper { left, oper, right } => {
-                    let left = self.expr(left.expr);
-                    let right = self.expr(right.expr);
+                    let left = self.expr(*left);
+                    let right = self.expr(*right);
                     match oper.node {
                         Operator::And => unimplemented!(),
                         Operator::Divide => unimplemented!(),
@@ -313,12 +328,17 @@ impl Gen {
                 Expr::Sequence(mut exprs) => {
                     let last_expr = exprs.pop().expect("at least one expression in sequence");
                     for expr in exprs {
-                        self.expr(expr.expr);
+                        self.expr(expr);
                     }
-                    self.expr(last_expr.expr)
+                    self.expr(last_expr)
                 },
                 Expr::Str { ref value } => {
                     self.builder.global_string_ptr(value, "string")
+                },
+                Expr::Record { fields, .. } => {
+                    let fields: Vec<_> = fields.iter().map(|field| to_llvm_type(&field.node.expr.typ)).collect();
+                    let typ = types::structure::new(&fields, false);
+                    self.builder.alloca(typ, "struct")
                 },
                 Expr::Variable(variable) => self.variable(variable),
                 Expr::While { body, condition } => {
@@ -329,7 +349,7 @@ impl Gen {
                     self.builder.br(&start_loop_basic_block);
                     self.builder.position_at_end(&start_loop_basic_block);
 
-                    let condition = self.expr(condition.expr);
+                    let condition = self.expr(*condition);
                     let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "whilecond");
 
                     let loop_basic_block = BasicBlock::append(&function, "loop");
@@ -340,7 +360,7 @@ impl Gen {
                     self.builder.position_at_end(&loop_basic_block);
 
                     let previous_break_label = self.break_label.clone();
-                    self.expr(body.expr);
+                    self.expr(*body);
                     self.break_label = previous_break_label;
                     self.builder.br(&start_loop_basic_block);
 
@@ -348,7 +368,6 @@ impl Gen {
 
                     constant::null(types::int32())
                 },
-                _ => unimplemented!("{:?}", expr),
             };
         value
     }
@@ -358,12 +377,11 @@ impl Gen {
         self.builder.position_at_end(&entry);
         self.create_argument_allocas(&function.llvm_function, &function);
 
-        let return_value = self.expr(function.body.expr);
-
         if function.body.typ == Type::Unit {
             self.builder.ret_no_value();
         }
         else {
+            let return_value = self.expr(function.body);
             self.builder.ret(&return_value);
         }
         if function.llvm_function.verify(VerifierFailureAction::AbortProcess) {
@@ -413,7 +431,7 @@ impl Gen {
             Var::Subscript { this, expr } => {
                 let llvm_type = to_llvm_type(&this.typ);
                 let this = self.variable_address(*this);
-                let index = self.expr(expr.expr);
+                let index = self.expr(*expr);
                 let pointer = self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index");
                 self.builder.load(typ, &pointer, "")
             },
@@ -428,7 +446,7 @@ impl Gen {
             Var::Subscript { this, expr } => {
                 let llvm_type = to_llvm_type(&variable.typ);
                 let this = self.variable_address(*this);
-                let index = self.expr(expr.expr);
+                let index = self.expr(*expr);
                 self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
             },
         }
@@ -447,5 +465,13 @@ fn size_of(typ: &Type) -> usize {
     match *typ {
         Type::Int32 => 4,
         _ => unimplemented!("size_of {:?}", typ),
+    }
+}
+
+fn dummy_nil() -> TypedExpr {
+    TypedExpr {
+        expr: Expr::Nil,
+        typ: Type::Unit,
+        pos: Pos::dummy(),
     }
 }
