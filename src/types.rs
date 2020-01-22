@@ -30,7 +30,7 @@ pub enum Type {
     Int32,
     String,
     Record(Symbol, Vec<(Symbol, Type)>, Unique),
-    Array(Box<Type>, usize, Unique),
+    Array(Box<Type>, usize),
     Nil,
     Unit,
     Name(SymbolWithPos, Box<Type>),
@@ -55,7 +55,7 @@ impl Display for Type {
                     }
                     "}".to_string()
                 },
-                Array(ref typ, size, _) => {
+                Array(ref typ, size) => {
                     write!(formatter, "[{}; {}]", typ, size)?;
                     return Ok(());
                 },

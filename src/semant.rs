@@ -262,7 +262,7 @@ impl<'a> SemanticAnalyzer<'a> {
             Expr::Array { init, size } => {
                 let init_expr = self.trans_exp(*init);
                 TypedExpr {
-                    typ: Type::Array(Box::new(init_expr.typ.clone()), size, Unique::new()),
+                    typ: Type::Array(Box::new(init_expr.typ.clone()), size),
                     expr: tast::Expr::Array { init: Box::new(init_expr), size },
                     pos: expr.pos,
                 }
@@ -553,7 +553,7 @@ impl<'a> SemanticAnalyzer<'a> {
         match ty.node {
             Ty::Array { ref ident, size } => {
                 let ty = self.get_type(ident, AddError);
-                Type::Array(Box::new(ty), size, Unique::new())
+                Type::Array(Box::new(ty), size)
             },
             Ty::Name { ref ident } => self.get_type(ident, AddError),
             Ty::Record { ref fields } => {
@@ -619,7 +619,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 let subscript_expr = Box::new(self.trans_exp(*expr));
                 self.check_int(&subscript_expr, subscript_expr.pos);
                 match var.typ.clone() {
-                    Type::Array(typ, _, _) => TypedVar {
+                    Type::Array(typ, _) => TypedVar {
                         typ: self.actual_ty_var(&typ),
                         pos: var.pos,
                         var: tast::Var::Subscript { expr: subscript_expr, this: var },

@@ -87,7 +87,7 @@ pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
         Type::Int32 => types::integer::int32(), // TODO: int64?
         Type::String => types::pointer::new(types::int8(), 0),
         Type::Record(_symbol, ref _fields, _) => unimplemented!(),
-        Type::Array(ref typ, size, _) => types::array::array(to_llvm_type(typ), size),
+        Type::Array(ref typ, size) => types::array::array(to_llvm_type(typ), size),
         Type::Nil => types::integer::int32(), // TODO: int64 or pointer type?
         Type::Unit => types::void(),
         Type::Name(ref _symbol, ref _type) => unimplemented!(),
@@ -173,7 +173,7 @@ impl Gen {
             },
             Declaration::Variable { init, value, .. } => {
                 let init_value = self.expr(init.expr);
-                if let Type::Array(ref typ, size, _) = init.typ {
+                if let Type::Array(ref typ, size) = init.typ {
                     let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
                     self.builder.mem_move(&value, align_of(&init.typ), &init_value, align_of(&init.typ), &size);
                 }
@@ -208,7 +208,13 @@ impl Gen {
                                 self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
                             },
                         };
-                    self.builder.store(&value, &variable)
+                        if let Type::Array(ref typ, size) = expr.typ {
+                            let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
+                            self.builder.mem_move(&variable, align_of(&expr.typ), &value, align_of(&expr.typ), &size)
+                        }
+                        else {
+                            self.builder.store(&value, &variable)
+                        }
                 },
                 Expr::Bool(value) => {
                     constant::int(types::int1(), value as u64, true)
@@ -397,7 +403,7 @@ impl Gen {
             Var::Field { .. } => unimplemented!(),
             Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
             Var::Simple { value } => {
-                if let Type::Array(_, _, _) = variable.typ {
+                if let Type::Array(_, _) = variable.typ {
                     value
                 }
                 else {
@@ -431,7 +437,7 @@ impl Gen {
 
 fn align_of(typ: &Type) -> usize {
     match *typ {
-        Type::Array(ref typ, _, _) => size_of(typ),
+        Type::Array(ref typ, _) => size_of(typ),
         Type::Int32 => size_of(typ),
         _ => unimplemented!("align_of {:?}", typ),
     }
