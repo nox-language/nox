@@ -1,1 +1,2 @@
-print(concat("Hello, ", "World!\n"))
+fun main() =
+    print(concat("Hello, ", "World!\n"))

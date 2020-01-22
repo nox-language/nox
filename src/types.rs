@@ -57,7 +57,6 @@ impl Display for Type {
                 },
                 Array(ref typ, size, _) => {
                     write!(formatter, "[{}; {}]", typ, size)?;
-                    typ.fmt(formatter)?;
                     return Ok(());
                 },
                 Nil => "nil".to_string(),

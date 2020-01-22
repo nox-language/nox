@@ -244,7 +244,6 @@ impl<'a> SemanticAnalyzer<'a> {
                 else if init.typ == Type::Error {
                     return None;
                 }
-                println!("Name {}: {:?}", name, init.typ);
                 let value = gen::create_entry_block_alloca(&self.current_function(), &self.symbol(name), &init.typ);
                 self.env.enter_var(name, Entry::Var { typ: init.typ.clone(), value: value.clone() });
                 Some(WithPos::new(tast::Declaration::Variable {
@@ -616,8 +615,6 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Var::Subscript { expr, this } => {
-                println!("** Var: {:?}", this);
-                println!("** Expr: {:?}", expr);
                 let var = Box::new(self.trans_var(*this));
                 let subscript_expr = Box::new(self.trans_exp(*expr));
                 self.check_int(&subscript_expr, subscript_expr.pos);

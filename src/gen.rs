@@ -172,7 +172,6 @@ impl Gen {
                 }
             },
             Declaration::Variable { init, value, .. } => {
-                println!("Var type: {:?}", init.typ);
                 let init_value = self.expr(init.expr);
                 if let Type::Array(ref typ, size, _) = init.typ {
                     let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
@@ -406,15 +405,9 @@ impl Gen {
                 }
             },
             Var::Subscript { this, expr } => {
-                println!("Var: {:?}", variable.typ);
-                println!("This: {:?}", this);
-                println!("Expr: {:?}", expr.typ);
                 let llvm_type = to_llvm_type(&this.typ);
                 let this = self.variable_address(*this);
                 let index = self.expr(expr.expr);
-                println!("gep type:");
-                llvm_type.dump();
-                println!();
                 let pointer = self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index");
                 self.builder.load(typ, &pointer, "")
             },

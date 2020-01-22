@@ -1,15 +1,12 @@
-(
+fun main() = (
     printi(ord("a"));
     print(chr(97));
     print("\n");
     print(chr(ord("a")));
     print("\n");
-    if "a" = "a" then
-        print("true\n");
-    let var char := getchar()
-    in (
-        print(char);
-        print("\n")
-    )
-    end
+    /*if "a" = "a" then
+        print("true\n");*/
+    var char := getchar();
+    print(char);
+    print("\n")
 )
