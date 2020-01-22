@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2017-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -95,12 +95,21 @@ impl<T> Symbols<T> {
     }
 
     pub fn symbol(&mut self, string: &str) -> Symbol {
+        debug_assert!(!string.is_empty());
+
         if let Some((&key, _)) = self.strings.strings.borrow().iter().find(|&(_, value)| value == string) {
             return key;
         }
 
         let symbol = *self.strings.next_symbol.borrow();
         self.strings.strings.borrow_mut().insert(symbol, string.to_string());
+        *self.strings.next_symbol.borrow_mut() += 1;
+        symbol
+    }
+
+    pub fn unnamed(&mut self) -> Symbol {
+        let symbol = *self.strings.next_symbol.borrow();
+        self.strings.strings.borrow_mut().insert(symbol, "<unnamed>".to_string());
         *self.strings.next_symbol.borrow_mut() += 1;
         symbol
     }

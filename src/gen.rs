@@ -84,7 +84,7 @@ fn to_real_rel_op(op: Operator) -> RealPredicate {
 pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
     match *typ {
         Type::Bool => types::integer::int1(),
-        Type::Int => types::integer::int32(), // TODO: int64?
+        Type::Int32 => types::integer::int32(), // TODO: int64?
         Type::String => types::pointer::new(types::int8(), 0),
         Type::Record(_symbol, ref _fields, _) => unimplemented!(),
         Type::Array(ref typ, size, _) => types::array::array(to_llvm_type(typ), size),
@@ -173,18 +173,12 @@ impl Gen {
             },
             Declaration::Variable { init, value, .. } => {
                 println!("Var type: {:?}", init.typ);
-                println!("Init expr: {:?}", init.expr);
                 let init_value = self.expr(init.expr);
                 if let Type::Array(ref typ, size, _) = init.typ {
                     let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
                     self.builder.mem_move(&value, align_of(&init.typ), &init_value, align_of(&init.typ), &size);
                 }
                 else {
-                    println!("Init:");
-                    init_value.get_type().dump();
-                    println!("\nPointer:");
-                    value.get_type().dump();
-                    println!();
                     self.builder.store(&init_value, &value);
                 }
             },
@@ -403,7 +397,14 @@ impl Gen {
         match variable.var {
             Var::Field { .. } => unimplemented!(),
             Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
-            Var::Simple { value } => self.builder.load(typ, &value, ""),
+            Var::Simple { value } => {
+                if let Type::Array(_, _, _) = variable.typ {
+                    value
+                }
+                else {
+                    self.builder.load(typ, &value, "")
+                }
+            },
             Var::Subscript { this, expr } => {
                 println!("Var: {:?}", variable.typ);
                 println!("This: {:?}", this);
@@ -438,14 +439,14 @@ impl Gen {
 fn align_of(typ: &Type) -> usize {
     match *typ {
         Type::Array(ref typ, _, _) => size_of(typ),
-        Type::Int => size_of(typ),
+        Type::Int32 => size_of(typ),
         _ => unimplemented!("align_of {:?}", typ),
     }
 }
 
 fn size_of(typ: &Type) -> usize {
     match *typ {
-        Type::Int => 8,
+        Type::Int32 => 4,
         _ => unimplemented!("size_of {:?}", typ),
     }
 }

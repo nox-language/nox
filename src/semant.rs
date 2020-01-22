@@ -147,7 +147,7 @@ impl<'a> SemanticAnalyzer<'a> {
         TypedExpr {
             expr: tast::Expr::Oper { left, oper, right },
             pos,
-            typ: Type::Int,
+            typ: Type::Int32,
         }
     }
 
@@ -176,9 +176,9 @@ impl<'a> SemanticAnalyzer<'a> {
     }
 
     fn check_int(&mut self, expr: &TypedExpr, pos: Pos) {
-        if expr.typ != Type::Int && expr.typ != Type::Error {
+        if expr.typ != Type::Int32 && expr.typ != Type::Error {
             return self.add_error(Error::Type {
-                expected: Type::Int,
+                expected: Type::Int32,
                 pos,
                 unexpected: expr.typ.clone(),
             }, ());
@@ -240,6 +240,9 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
                 else if init.typ == Type::Nil {
                     return self.add_error(Error::RecordType { pos: declaration.pos }, None);
+                }
+                else if init.typ == Type::Error {
+                    return None;
                 }
                 println!("Name {}: {:?}", name, init.typ);
                 let value = gen::create_entry_block_alloca(&self.current_function(), &self.symbol(name), &init.typ);
@@ -341,7 +344,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 TypedExpr {
                     expr: tast::Expr::Int { value },
                     pos: expr.pos,
-                    typ: Type::Int,
+                    typ: Type::Int32,
                 },
             Expr::Decl(declaration) => {
                 let old_in_loop = self.in_loop;
@@ -349,10 +352,14 @@ impl<'a> SemanticAnalyzer<'a> {
                 self.in_loop = false;
                 let declaration = self.trans_dec(*declaration);
                 self.in_loop = old_in_loop;
-                TypedExpr {
-                    expr: tast::Expr::Decl(Box::new(declaration.expect("declaration"))), // TODO: handle error.
-                    pos: expr.pos,
-                    typ: Type::Unit,
+                match declaration {
+                    Some(declaration) =>
+                        TypedExpr {
+                            expr: tast::Expr::Decl(Box::new(declaration)),
+                            pos: expr.pos,
+                            typ: Type::Unit,
+                        },
+                    None => exp_type_error(),
                 }
             },
             Expr::Nil =>
@@ -609,6 +616,8 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Var::Subscript { expr, this } => {
+                println!("** Var: {:?}", this);
+                println!("** Expr: {:?}", expr);
                 let var = Box::new(self.trans_var(*this));
                 let subscript_expr = Box::new(self.trans_exp(*expr));
                 self.check_int(&subscript_expr, subscript_expr.pos);

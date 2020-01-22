@@ -56,7 +56,7 @@ impl Env {
     pub fn new(strings: &Rc<Strings>, module: &Module) -> Self {
         let mut type_env = Symbols::new(Rc::clone(strings));
         let int_symbol = type_env.symbol("int");
-        type_env.enter(int_symbol, Type::Int);
+        type_env.enter(int_symbol, Type::Int32);
         let string_symbol = type_env.symbol("string");
         type_env.enter(string_symbol, Type::String);
 
@@ -131,19 +131,19 @@ impl Env {
 pub fn external_functions() -> HashMap<&'static str, (Vec<Type>, Type)> {
     let mut functions = HashMap::new();
     functions.insert("print", (vec![Type::String], Type::Unit));
-    functions.insert("printi", (vec![Type::Int], Type::Unit));
+    functions.insert("printi", (vec![Type::Int32], Type::Unit));
     functions.insert("flush", (vec![], Type::Unit));
     functions.insert("getchar", (vec![], Type::String));
-    functions.insert("ord", (vec![Type::String], Type::Int));
-    functions.insert("chr", (vec![Type::Int], Type::String));
-    functions.insert("size", (vec![Type::String], Type::Int));
-    functions.insert("substring", (vec![Type::String, Type::Int, Type::Int], Type::String));
+    functions.insert("ord", (vec![Type::String], Type::Int32));
+    functions.insert("chr", (vec![Type::Int32], Type::String));
+    functions.insert("size", (vec![Type::String], Type::Int32));
+    functions.insert("substring", (vec![Type::String, Type::Int32, Type::Int32], Type::String));
     functions.insert("concat", (vec![Type::String, Type::String], Type::String));
-    functions.insert("not", (vec![Type::Int], Type::Int));
-    functions.insert("exit", (vec![Type::Int], Type::Unit));
-    functions.insert("stringEqual", (vec![Type::String, Type::String], Type::Int));
+    functions.insert("not", (vec![Type::Int32], Type::Int32));
+    functions.insert("exit", (vec![Type::Int32], Type::Unit));
+    functions.insert("stringEqual", (vec![Type::String, Type::String], Type::Int32));
 
-    functions.insert("malloc", (vec![Type::Int], Type::Int));
-    functions.insert("initArray", (vec![Type::Int, Type::Int], Type::Int));
+    functions.insert("malloc", (vec![Type::Int32], Type::Int32));
+    functions.insert("initArray", (vec![Type::Int32, Type::Int32], Type::Int32));
     functions
 }

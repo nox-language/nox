@@ -30,7 +30,7 @@ pub enum Declaration {
         escape: bool,
         init: ExprWithPos,
         name: Symbol,
-        typ: Option<SymbolWithPos>,
+        typ: Option<SymbolWithPos>, // FIXME: allow compound type instead of requiring type declaration.
     },
 }
 

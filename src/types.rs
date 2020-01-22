@@ -27,7 +27,7 @@ use symbol::{Symbol, SymbolWithPos};
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     Bool,
-    Int,
+    Int32,
     String,
     Record(Symbol, Vec<(Symbol, Type)>, Unique),
     Array(Box<Type>, usize, Unique),
@@ -42,7 +42,7 @@ impl Display for Type {
         let string =
             match *self {
                 Bool => "bool".to_string(),
-                Int => "int".to_string(),
+                Int32 => "int32".to_string(),
                 String => "string".to_string(),
                 Record(_, ref types, _) => {
                     write!(formatter, "{{")?;

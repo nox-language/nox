@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2017-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -59,7 +59,7 @@ use error::Error;
 use error::Error::UnexpectedToken;
 use lexer::Lexer;
 use position::{Pos, WithPos};
-use symbol::{Symbols, SymbolWithPos};
+use symbol::{Symbol, Symbols, SymbolWithPos};
 use token::{Tok, Token};
 use token::Tok::*;
 
@@ -163,10 +163,35 @@ impl<'a, R: Read> Parser<'a, R> {
         let size;
         eat!(self, Int, size);
         eat!(self, CloseSquare);
-        Ok(WithPos::new(Expr::Array {
-            init,
-            size: size as usize,
-        }, pos))
+        let name = self.symbols.unnamed();
+        let for_value = self.symbols.unnamed();
+        Ok(WithPos::new(Expr::Sequence(vec![
+            WithPos::new(Expr::Decl(Box::new(WithPos::new(
+                Declaration::Variable {
+                    escape: false,
+                    init:
+                        WithPos::new(Expr::Array {
+                            init: init.clone(), // TODO: might not be needed anymore.
+                            size: size as usize,
+                        }, pos),
+                    name,
+                    typ: None,
+                },
+                pos))
+            ), pos),
+            for_loop(&mut self.symbols, for_value,
+                WithPos::new(Expr::Assign {
+                    expr: init, // TODO: might require a clone.
+                    var:
+                        WithPos::new(Var::Subscript {
+                            expr: Box::new(WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(for_value, pos) }, pos)), pos)),
+                            this: Box::new(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)),
+                        }, pos)
+                }, pos), pos,
+                WithPos::new(Expr::Int { value: 0 }, pos),
+                WithPos::new(Expr::Int { value: size - 1 }, pos), pos),
+            WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)), pos),
+        ]), pos))
     }
 
     fn arr_ty(&mut self) -> Result<TyWithPos> {
@@ -284,9 +309,6 @@ impl<'a, R: Read> Parser<'a, R> {
         let pos = eat!(self, For);
         let var_name;
         let var_pos = eat!(self, Ident, var_name);
-        let var = self.symbols.symbol(&var_name);
-        let iter_variable = WithPos::new(Var::Simple { ident: WithPos::new(var, var_pos) }, var_pos);
-        let iter_variable_expr = WithPos::new(Expr::Variable(iter_variable.clone()), var_pos);
         eat!(self, ColonEqual);
         let start = self.expr()?;
         eat!(self, To);
@@ -294,66 +316,8 @@ impl<'a, R: Read> Parser<'a, R> {
         eat!(self, Do);
         let body = self.expr()?;
         // Convert for loop into while loop.
-        let start_symbol = self.symbols.symbol(&var_name);
-        let end_symbol = self.symbols.symbol(&format!("__{}_limit", var_name));
-        let body =
-            Expr::If {
-                else_: None,
-                condition: Box::new(
-                    WithPos::dummy(Expr::Oper {
-                        left: Box::new(iter_variable_expr.clone()),
-                        oper: WithPos::dummy(Operator::Le),
-                        right: Box::new(dummy_var_expr(end_symbol)),
-                    })
-                ),
-                then:
-                    Box::new(WithPos::dummy(Expr::While {
-                        body: Box::new(WithPos::dummy(Expr::Sequence(vec![
-                            body,
-                            WithPos::dummy(Expr::If {
-                                else_: Some(Box::new(WithPos::dummy(Expr::Break))),
-                                condition:
-                                    Box::new(WithPos::dummy(Expr::Oper {
-                                        left: Box::new(iter_variable_expr.clone()),
-                                        oper: WithPos::dummy(Operator::Lt),
-                                        right: Box::new(dummy_var_expr(end_symbol)),
-                                    })),
-                                then:
-                                    Box::new(WithPos::dummy(Expr::Assign {
-                                        expr: Box::new(WithPos::dummy(Expr::Oper {
-                                            left: Box::new(iter_variable_expr),
-                                            oper: WithPos::dummy(Operator::Plus),
-                                            right: Box::new(WithPos::dummy(Expr::Int { value: 1 })),
-                                        })),
-                                        var: iter_variable,
-                                    })),
-                            }),
-                        ]))),
-                        condition: Box::new(WithPos::dummy(Expr::Bool(true))),
-                    })),
-            };
-
-        let declarations = Expr::Sequence(vec![
-            WithPos::dummy(Expr::Decl(
-                Box::new(WithPos::dummy(Variable {
-                    escape: false,
-                    init: start,
-                    name: start_symbol,
-                    typ: None,
-                }))
-            )),
-            WithPos::dummy(Expr::Decl(
-                Box::new(WithPos::dummy(Variable {
-                    escape: false,
-                    init: end,
-                    name: end_symbol,
-                    typ: None,
-                }))
-            )),
-            WithPos::dummy(body)
-        ]);
-
-        Ok(WithPos::new(declarations, pos))
+        let var = self.symbols.symbol(&var_name);
+        Ok(for_loop(&mut self.symbols, var, body, var_pos, start, end, pos))
     }
 
     fn fun_dec(&mut self) -> Result<FuncDeclarationWithPos> {
@@ -752,4 +716,70 @@ impl<'a, R: Read> Parser<'a, R> {
             unexpected: token.token,
         })
     }
+}
+
+fn for_loop(symbols: &mut Symbols<()>, var: Symbol, body: ExprWithPos, var_pos: Pos, start: ExprWithPos, end: ExprWithPos, pos: Pos) -> ExprWithPos {
+    let iter_variable = WithPos::new(Var::Simple { ident: WithPos::new(var, var_pos) }, var_pos);
+    let iter_variable_expr = WithPos::new(Expr::Variable(iter_variable.clone()), var_pos);
+
+    let start_symbol = var;
+    let end_symbol = symbols.unnamed();
+    let body =
+        Expr::If {
+            else_: None,
+            condition: Box::new(
+                WithPos::dummy(Expr::Oper {
+                    left: Box::new(iter_variable_expr.clone()),
+                    oper: WithPos::dummy(Operator::Le),
+                    right: Box::new(dummy_var_expr(end_symbol)),
+                })
+            ),
+            then:
+                Box::new(WithPos::dummy(Expr::While {
+                    body: Box::new(WithPos::dummy(Expr::Sequence(vec![
+                        body,
+                        WithPos::dummy(Expr::If {
+                            else_: Some(Box::new(WithPos::dummy(Expr::Break))),
+                            condition:
+                                Box::new(WithPos::dummy(Expr::Oper {
+                                    left: Box::new(iter_variable_expr.clone()),
+                                    oper: WithPos::dummy(Operator::Lt),
+                                    right: Box::new(dummy_var_expr(end_symbol)),
+                                })),
+                            then:
+                                Box::new(WithPos::dummy(Expr::Assign {
+                                    expr: Box::new(WithPos::dummy(Expr::Oper {
+                                        left: Box::new(iter_variable_expr),
+                                        oper: WithPos::dummy(Operator::Plus),
+                                        right: Box::new(WithPos::dummy(Expr::Int { value: 1 })),
+                                    })),
+                                    var: iter_variable,
+                                })),
+                        }),
+                    ]))),
+                    condition: Box::new(WithPos::dummy(Expr::Bool(true))),
+                })),
+        };
+
+    let declarations = Expr::Sequence(vec![
+        WithPos::dummy(Expr::Decl(
+            Box::new(WithPos::dummy(Variable {
+                escape: false,
+                init: start,
+                name: start_symbol,
+                typ: None,
+            }))
+        )),
+        WithPos::dummy(Expr::Decl(
+            Box::new(WithPos::dummy(Variable {
+                escape: false,
+                init: end,
+                name: end_symbol,
+                typ: None,
+            }))
+        )),
+        WithPos::dummy(body)
+    ]);
+
+    WithPos::new(declarations, pos)
 }
