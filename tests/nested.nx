@@ -1,18 +1,17 @@
-let function f() =
-        let var v := 6
-        in
-            printi(v);
-            let var v := 7
-            in
-                printi(v)
-            end;
-            printi(v);
-            let var v := 8
-            in
-                printi(v)
-            end;
-            printi(v)
-        end
-in
+fun f() = (
+    var v := 6;
+    printi(v);
+    (
+        var v := 7;
+        printi(v)
+    );
+    printi(v);
+    (
+        var v := 8;
+        printi(v)
+    );
+    printi(v)
+)
+
+fun main() =
     f()
-end
