@@ -216,7 +216,7 @@ impl Gen {
                             match var.var {
                                 Var::Field { .. } => unreachable!(),
                                 Var::Global { .. } => unreachable!(),
-                                Var::Simple { .. } => unreachable!(),
+                                Var::Simple { value } => value,
                                 Var::Subscript { expr, this } => {
                                     let index = self.expr(*expr);
                                     let llvm_type = to_llvm_type(&this.typ);
