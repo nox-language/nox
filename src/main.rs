@@ -20,6 +20,8 @@
  */
 
 /*
+ * FIXME: global array does not compile.
+ * TODO: change the struct definition syntax to `struct Name { … }`?
  * TODO: allow leading commas (for fields in struct, in arrays, parameters).
  * TODO: functions without parameters do not need parentheses?
  * TODO: error on missing a main function.

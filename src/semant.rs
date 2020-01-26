@@ -227,7 +227,7 @@ impl<'a> SemanticAnalyzer<'a> {
             Declaration::Type(type_declaration) => {
                 self.check_duplicate_types(&type_declaration);
                 let name = &type_declaration.node.name;
-                let new_type = self.trans_ty(name.node, &type_declaration.node.ty);
+                let new_type = self.trans_ty(&type_declaration.node.ty);
                 println!("New type: {:?}", new_type);
                 self.env.enter_type(name.node, new_type);
 
@@ -235,16 +235,21 @@ impl<'a> SemanticAnalyzer<'a> {
             },
             Declaration::Variable { escape, init, name, typ, .. } => {
                 let init = self.trans_exp(init);
-                if let Some(ref ident) = typ {
-                    let typ = self.get_type(ident, AddError);
-                    self.check_types(&typ, &init.typ, ident.pos);
-                }
-                else if init.typ == Type::Nil {
-                    return self.add_error(Error::StructType { pos: declaration.pos }, None);
-                }
-                else if init.typ == Type::Error {
-                    return None;
-                }
+                let typ =
+                    if let Some(ref ident) = typ {
+                        let typ = self.trans_ty(ident);
+                        self.check_types(&typ, &init.typ, ident.pos);
+                        Some(typ)
+                    }
+                    else if init.typ == Type::Nil {
+                        return self.add_error(Error::StructType { pos: declaration.pos }, None);
+                    }
+                    else if init.typ == Type::Error {
+                        return None;
+                    }
+                    else {
+                        None
+                    };
                 let value = gen::create_entry_block_alloca(&self.current_function(), &self.symbol(name), &init.typ);
                 self.env.enter_var(name, Entry::Var { typ: init.typ.clone(), value: value.clone() });
                 Some(WithPos::new(tast::Declaration::Variable {
@@ -495,7 +500,7 @@ impl<'a> SemanticAnalyzer<'a> {
 
         let result_type =
             if let Some(ref result) = function.result {
-                self.get_type(result, DontAddError)
+                self.trans_ty(result)
             }
             else {
                 Type::Unit
@@ -551,20 +556,19 @@ impl<'a> SemanticAnalyzer<'a> {
         WithPos::new(tast::Declaration::Function(function), pos)
     }
 
-    fn trans_ty(&mut self, symbol: Symbol, ty: &TyWithPos) -> Type {
+    fn trans_ty(&mut self, ty: &TyWithPos) -> Type {
         match ty.node {
-            Ty::Array { ref ident, size } => {
-                let ty = self.get_type(ident, AddError);
-                Type::Array(Box::new(ty), size)
+            Ty::Array { size, ref typ } => {
+                Type::Array(Box::new(self.trans_ty(typ)), size)
             },
             Ty::Name { ref ident } => self.get_type(ident, AddError),
-            Ty::Struct { ref fields } => {
+            Ty::Struct { ref fields, ref typ } => {
                 let mut struct_fields = vec![];
                 for field in fields {
                     let typ = self.get_type(&field.node.typ, AddError);
                     struct_fields.push((field.node.name, typ));
                 }
-                Type::Struct(symbol, struct_fields, Unique::new())
+                Type::Struct(typ.node, struct_fields, Unique::new())
             },
         }
     }

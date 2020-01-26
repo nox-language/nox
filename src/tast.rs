@@ -37,7 +37,7 @@ pub enum Declaration {
         escape: bool,
         init: TypedExpr,
         name: Symbol,
-        typ: Option<SymbolWithPos>,
+        typ: Option<Type>,
         value: Value,
     },
 }

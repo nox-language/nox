@@ -88,7 +88,7 @@ pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
         Type::Bool => types::integer::int1(),
         Type::Int32 => types::integer::int32(), // TODO: int64?
         Type::String => types::pointer::new(types::int8(), 0),
-        Type::Struct(_symbol, ref fields, _) => {
+        Type::Struct(_, ref fields, _) => {
             let types: Vec<_> = fields.iter().map(|(_symbol, typ)| to_llvm_type(typ)).collect();
             types::structure::new(&types, false)
         },
@@ -238,7 +238,13 @@ impl Gen {
                                 },
                                 Var::Global { .. } => unreachable!(),
                                 Var::Simple { value } => value,
-                                Var::Subscript { .. } => unreachable!(),
+                                Var::Subscript { expr, this } => {
+                                    // TODO: remove this code duplicate?
+                                    let index = self.expr(*expr);
+                                    let llvm_type = to_llvm_type(&this.typ);
+                                    let this = self.variable_address(*this);
+                                    self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
+                                },
                             };
                         self.builder.store(&value, &variable)
                     }
@@ -397,6 +403,7 @@ impl Gen {
             let return_value = self.expr(function.body);
             self.builder.ret(&return_value);
         }
+        function.llvm_function.dump();
         if function.llvm_function.verify(VerifierFailureAction::AbortProcess) {
             function.llvm_function.dump();
         }

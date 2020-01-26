@@ -1,43 +1,41 @@
 /* A program to solve the 8-queens problem */
 
-let var N := 8
+var N: int := 8
+var row: [int; 8] := [0; 8]
+var col: [int; 8] := [0; 8]
+var diag1: [int; 15] := [0; 15]
+var diag2: [int; 15] := [0; 15]
 
-    type intArray = array of int
-
-    var row := intArray [ N ] of 0
-    var col := intArray [ N ] of 0
-    var diag1:=intArray[N+N-1] of 0
-    var diag2 := intArray [N + N - 1] of 0
-
-    function printBoard() = (
-        for i := 0 to N - 1 do (
-            for j := 0 to N - 1 do
-                print(
-                    if col[i]=j then
-                        " O"
-                    else
-                        " ."
-                );
-            print("\n")
-        );
+fun printBoard() = (
+    for i := 0 to N - 1 do (
+        for j := 0 to N - 1 do
+            print(
+                if col[i]=j then
+                    " O"
+                else
+                    " ."
+            );
         print("\n")
-    )
+    );
+    print("\n")
+)
 
-    function try(c: int) =
-        if c=N then
-            printBoard()
-        else
-            for r := 0 to N - 1 do
-                if row[r] = 0 & diag1[r + c] = 0 & diag2[r + 7 - c] = 0 then (
-                    row[r] := 1;
-                    diag1[r + c] := 1;
-                    diag2[r + 7 - c] := 1;
-                    col[c] := r;
-                    try(c + 1);
-                    row[r] := 0;
-                    diag1[r + c] := 0;
-                    diag2[r + 7 - c] := 0
-                )
-in
+fun try(c: int) =
+    if c = N then
+        printBoard()
+    else
+        for r := 0 to N - 1 do
+            if row[r] = 0 & diag1[r + c] = 0 & diag2[r + 7 - c] = 0 then (
+                row[r] := 1;
+                diag1[r + c] := 1;
+                diag2[r + 7 - c] := 1;
+                col[c] := r;
+                try(c + 1);
+                row[r] := 0;
+                diag1[r + c] := 0;
+                diag2[r + 7 - c] := 0
+            )
+
+fun main() = (
     try(0)
-end
+)

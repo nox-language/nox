@@ -30,7 +30,7 @@ pub enum Declaration {
         escape: bool,
         init: ExprWithPos,
         name: Symbol,
-        typ: Option<SymbolWithPos>, // FIXME: allow compound type instead of requiring type declaration.
+        typ: Option<TyWithPos>,
     },
 }
 
@@ -88,7 +88,7 @@ pub type ExprWithPos = WithPos<Expr>;
 pub struct Field {
     pub escape: bool,
     pub name: Symbol,
-    pub typ: SymbolWithPos,
+    pub typ: SymbolWithPos, // TODO: use Ty instead of Symbol.
 }
 
 pub type FieldWithPos = WithPos<Field>;
@@ -98,7 +98,7 @@ pub struct FuncDeclaration {
     pub body: ExprWithPos,
     pub name: Symbol,
     pub params: Vec<FieldWithPos>,
-    pub result: Option<SymbolWithPos>,
+    pub result: Option<TyWithPos>,
 }
 
 pub type FuncDeclarationWithPos = WithPos<FuncDeclaration>;
@@ -132,14 +132,15 @@ pub type StructFieldWithPos = WithPos<StructField>;
 #[derive(Clone, Debug)]
 pub enum Ty {
     Array {
-        ident: SymbolWithPos,
         size: usize,
+        typ: Box<TyWithPos>,
     },
     Name {
         ident: SymbolWithPos,
     },
     Struct {
         fields: Vec<FieldWithPos>,
+        typ: SymbolWithPos,
     },
 }
 

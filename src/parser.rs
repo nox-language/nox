@@ -197,14 +197,15 @@ impl<'a, R: Read> Parser<'a, R> {
     }
 
     fn arr_ty(&mut self) -> Result<TyWithPos> {
-        let pos = eat!(self, Array);
-        eat!(self, Of);
-        let type_name;
-        let type_pos = eat!(self, Ident, type_name);
-        let ident = self.symbols.symbol(&type_name);
+        let pos = eat!(self, OpenSquare);
+        let typ = Box::new(self.ty()?);
+        eat!(self, Semicolon);
+        let size;
+        eat!(self, Int, size);
+        eat!(self, CloseSquare);
         Ok(WithPos::new(Ty::Array {
-            ident: WithPos::new(ident, type_pos),
-            size: 0, // TODO
+            size: size as usize,
+            typ,
         }, pos))
     }
 
@@ -462,14 +463,11 @@ impl<'a, R: Read> Parser<'a, R> {
         Ok(WithPos::new(Expr::Nil, pos))
     }
 
-    fn optional_type(&mut self) -> Result<Option<SymbolWithPos>> {
+    fn optional_type(&mut self) -> Result<Option<TyWithPos>> {
         let mut typ = None;
         if let Colon = self.peek()?.token {
             eat!(self, Colon);
-            let type_name;
-            let pos = eat!(self, Ident, type_name);
-            let ident = self.symbols.symbol(&type_name);
-            typ = Some(WithPos::new(ident, pos));
+            typ = Some(self.ty()?);
         }
         Ok(typ)
     }
@@ -538,11 +536,15 @@ impl<'a, R: Read> Parser<'a, R> {
     }
 
     fn struct_ty(&mut self) -> Result<TyWithPos> {
-        let pos = eat!(self, OpenCurly);
+        let typ;
+        let pos = eat!(self, Ident, typ);
+        let typ = WithPos::new(self.symbols.symbol(&typ), pos);
+        eat!(self, OpenCurly);
         let fields = fields!(self, CloseCurly);
         eat!(self, CloseCurly);
         Ok(WithPos::new(Ty::Struct {
             fields,
+            typ,
         }, pos))
     }
 
@@ -604,7 +606,7 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn ty(&mut self) -> Result<TyWithPos> {
         match self.peek()?.token {
-            Array => self.arr_ty(),
+            OpenSquare => self.arr_ty(),
             OpenCurly => self.struct_ty(),
             Ident(_) => {
                 let type_name;
