@@ -67,13 +67,13 @@ pub enum Expr {
         oper: OperatorWithPos,
         right: Box<ExprWithPos>,
     },
-    Record {
-        fields: Vec<RecordFieldWithPos>,
-        typ: SymbolWithPos,
-    },
     Sequence(Vec<ExprWithPos>),
     Str {
         value: String,
+    },
+    Struct {
+        fields: Vec<StructFieldWithPos>,
+        typ: SymbolWithPos,
     },
     Variable(VarWithPos),
     While {
@@ -122,12 +122,12 @@ pub enum Operator {
 pub type OperatorWithPos = WithPos<Operator>;
 
 #[derive(Clone, Debug)]
-pub struct RecordField {
+pub struct StructField {
     pub expr: ExprWithPos,
     pub ident: Symbol,
 }
 
-pub type RecordFieldWithPos = WithPos<RecordField>;
+pub type StructFieldWithPos = WithPos<StructField>;
 
 #[derive(Clone, Debug)]
 pub enum Ty {
@@ -138,7 +138,7 @@ pub enum Ty {
     Name {
         ident: SymbolWithPos,
     },
-    Record {
+    Struct {
         fields: Vec<FieldWithPos>,
     },
 }

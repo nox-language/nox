@@ -88,7 +88,7 @@ pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
         Type::Bool => types::integer::int1(),
         Type::Int32 => types::integer::int32(), // TODO: int64?
         Type::String => types::pointer::new(types::int8(), 0),
-        Type::Record(_symbol, ref fields, _) => {
+        Type::Struct(_symbol, ref fields, _) => {
             let types: Vec<_> = fields.iter().map(|(_symbol, typ)| to_llvm_type(typ)).collect();
             types::structure::new(&types, false)
         },
@@ -178,15 +178,23 @@ impl Gen {
             },
             Declaration::Type { .. } => (), // TODO: should we generate a llvm type declaration?
             Declaration::Variable { init, value, .. } => {
-                if let Type::Array(ref typ, size) = init.typ {
-                    let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
-                    let align = align_of(&init.typ);
-                    let init_value = self.expr(init);
-                    self.builder.mem_move(&value, align, &init_value, align, &size);
-                }
-                else {
-                    let init_value = self.expr(init);
-                    self.builder.store(&init_value, &value);
+                match init.typ {
+                    Type::Array(ref typ, size) => {
+                        let size = constant::int(types::int32(), (size_of(typ) * size) as u64, true);
+                        let align = align_of(&init.typ);
+                        let init_value = self.expr(init);
+                        self.builder.mem_move(&value, align, &init_value, align, &size);
+                    },
+                    Type::Struct(_, _, _) => {
+                        let size = constant::int(types::int32(), size_of(&init.typ) as u64, true);
+                        let align = align_of(&init.typ);
+                        let init_value = self.expr(init);
+                        self.builder.mem_move(&value, align, &init_value, align, &size);
+                    },
+                    _ => {
+                        let init_value = self.expr(init);
+                        self.builder.store(&init_value, &value);
+                    },
                 }
             },
         }
@@ -223,7 +231,11 @@ impl Gen {
                         let value = self.expr(*expr);
                         let variable =
                             match var.var {
-                                Var::Field { .. } => unimplemented!(),
+                                Var::Field { index, this } => {
+                                    let llvm_type = to_llvm_type(&this.typ);
+                                    let this = self.variable_address(*this);
+                                    self.builder.struct_gep(&llvm_type, &this, index, "field")
+                                },
                                 Var::Global { .. } => unreachable!(),
                                 Var::Simple { value } => value,
                                 Var::Subscript { .. } => unreachable!(),
@@ -335,7 +347,7 @@ impl Gen {
                 Expr::Str { ref value } => {
                     self.builder.global_string_ptr(value, "string")
                 },
-                Expr::Record { fields, .. } => {
+                Expr::Struct { fields, .. } => {
                     let fields: Vec<_> = fields.iter().map(|field| to_llvm_type(&field.node.expr.typ)).collect();
                     let typ = types::structure::new(&fields, false);
                     self.builder.alloca(typ, "struct")
@@ -378,6 +390,7 @@ impl Gen {
         self.create_argument_allocas(&function.llvm_function, &function);
 
         if function.body.typ == Type::Unit {
+            self.expr(function.body);
             self.builder.ret_no_value();
         }
         else {
@@ -418,16 +431,18 @@ impl Gen {
     fn variable(&mut self, variable: TypedVar) -> Value {
         let typ = to_llvm_type(&variable.typ);
         match variable.var {
-            Var::Field { .. } => unimplemented!(),
-            Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
-            Var::Simple { value } => {
-                if let Type::Array(_, _) = variable.typ {
-                    value
-                }
-                else {
-                    self.builder.load(typ, &value, "")
-                }
+            Var::Field { index, this } => {
+                let llvm_type = to_llvm_type(&this.typ);
+                let this = self.variable_address(*this);
+                let pointer = self.builder.struct_gep(&llvm_type, &this, index, "field");
+                self.builder.load(typ, &pointer, "")
             },
+            Var::Global { llvm_function } => self.builder.call(llvm_function.clone(), &[], ""),
+            Var::Simple { value } =>
+                match variable.typ {
+                    Type::Array { .. } | Type::Struct { .. } => value,
+                    _ => self.builder.load(typ, &value, "")
+                },
             Var::Subscript { this, expr } => {
                 let llvm_type = to_llvm_type(&this.typ);
                 let this = self.variable_address(*this);
@@ -457,6 +472,7 @@ fn align_of(typ: &Type) -> usize {
     match *typ {
         Type::Array(ref typ, _) => size_of(typ),
         Type::Int32 => size_of(typ),
+        Type::Struct(_, _, _) => size_of(&Type::Int32), // TODO: compute real struct alignment.
         _ => unimplemented!("align_of {:?}", typ),
     }
 }
@@ -464,6 +480,10 @@ fn align_of(typ: &Type) -> usize {
 fn size_of(typ: &Type) -> usize {
     match *typ {
         Type::Int32 => 4,
+        Type::Struct(_, ref fields, _) =>
+            fields.iter().map(|(_, typ)| size_of(typ))
+                .sum()
+        ,
         _ => unimplemented!("size_of {:?}", typ),
     }
 }

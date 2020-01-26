@@ -37,14 +37,14 @@ let function hello(param: string) = print("Hello, World!\n")
         myNum: unexisting
     }
     type intArray2 = array of unexisting
-    var record: myStruct := nil
+    var struct: myStruct := nil
     type x1 = y1
     type y1 = z1
     type z1 = x1
     type x = y
     type y = z
     type z = { field: x }
-    var record2 := nil
+    var struct2 := nil
     var string2: string := nil
     var string2: unexisting := 42
     var string2: string := 42
@@ -57,28 +57,28 @@ in (
         var arrayOfString := intArray ["test"] of 42
         var none := value := 10
         var none2 := value := "test"
-        type MyRecord = { myField: int, secondField: int }
-        var record := MyRecord
+        type MyStruct = { myField: int, secondField: int }
+        var struct := MyStruct
             { myField = 10
             , secondField = 42
             }
-        var record2 := int
+        var struct2 := int
             { myField = 10
             , secondField = 42
             }
-        var record2 := MyRecord
+        var struct2 := MyStruct
             { myField = 10
             , secondField = 42
             , secondField2 = 42
             }
-        var record2 := MyRecord
+        var struct2 := MyStruct
             { myField = 10
             }
-        var record2 := MyRecord
+        var struct2 := MyStruct
             { myField = "10"
             , secondField = 42
             }
-        var record2 := MyRecord2
+        var struct2 := MyStruct2
             { myField = 10
             , secondField = 42
             }
@@ -87,9 +87,9 @@ in (
         string[0] = 42;
         arrayOfInt["0"] = 42;
         arrayOfInt[0] = "42";
-        record.myField = 42;
-        record.myField2 = 42;
-        record.myField = "42";
+        struct.myField = 42;
+        struct.myField2 = 42;
+        struct.myField = "42";
         print("42")
     end;
     print("string");

@@ -44,8 +44,8 @@ use ast::{
     FuncDeclaration,
     FuncDeclarationWithPos,
     Operator,
-    RecordField,
-    RecordFieldWithPos,
+    StructField,
+    StructFieldWithPos,
     Ty,
     TypeDec,
     TypeDecWithPos,
@@ -179,6 +179,8 @@ impl<'a, R: Read> Parser<'a, R> {
                 },
                 pos))
             ), pos),
+            // FIXME: not sure it's a good idea to do the transformations in the parser itself, because
+            // the semantic analyzer could report errors in this generated code.
             for_loop(&mut self.symbols, for_value,
                 WithPos::new(Expr::Assign {
                     expr: init, // TODO: might require a clone.
@@ -242,7 +244,7 @@ impl<'a, R: Read> Parser<'a, R> {
         }
         else {
             match self.peek()?.token {
-                OpenCurly => self.rec_create(WithPos::new(symbol, pos), pos),
+                OpenCurly => self.struct_create(WithPos::new(symbol, pos), pos),
                 _ => {
                     let var = WithPos::new(Var::Simple {
                         ident: WithPos::new(symbol, pos),
@@ -293,13 +295,13 @@ impl<'a, R: Read> Parser<'a, R> {
         Ok(fields)
     }
 
-    fn field_create(&mut self) -> Result<RecordFieldWithPos> {
+    fn field_create(&mut self) -> Result<StructFieldWithPos> {
         let field_name;
         let pos = eat!(self, Ident, field_name);
         let ident = self.symbols.symbol(&field_name);
         eat!(self, Equal);
         let expr = self.expr()?;
-        Ok(WithPos::new(RecordField {
+        Ok(WithPos::new(StructField {
             expr,
             ident,
         }, pos))
@@ -492,7 +494,7 @@ impl<'a, R: Read> Parser<'a, R> {
         }
     }
 
-    fn rec_create(&mut self, typ: SymbolWithPos, pos: Pos) -> Result<ExprWithPos> {
+    fn struct_create(&mut self, typ: SymbolWithPos, pos: Pos) -> Result<ExprWithPos> {
         eat!(self, OpenCurly);
         let field = self.field_create()?;
         let mut fields = vec![field];
@@ -501,17 +503,45 @@ impl<'a, R: Read> Parser<'a, R> {
             fields.push(self.field_create()?)
         }
         eat!(self, CloseCurly);
-        Ok(WithPos::new(Expr::Record {
-            fields,
-            typ,
-        }, pos))
+
+        // FIXME: not sure it's a good idea to do the transformations in the parser itself, because
+        // the semantic analyzer could report errors in this generated code.
+        let name = self.symbols.unnamed();
+        let mut sequence = vec![
+            WithPos::new(Expr::Decl(Box::new(WithPos::new(
+                Declaration::Variable {
+                    escape: false,
+                    init:
+                        WithPos::new(Expr::Struct {
+                            fields: fields.clone(), // TODO: remove this clone.
+                            typ,
+                        }, pos),
+                    name,
+                    typ: None,
+                },
+                pos))
+            ), pos),
+        ];
+        for field in fields {
+            sequence.push(WithPos::new(Expr::Assign {
+                expr: Box::new(field.node.expr),
+                var:
+                    WithPos::new(Var::Field {
+                        ident: WithPos::new(field.node.ident, field.pos),
+                        this: Box::new(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)),
+                    }, pos)
+            }, pos));
+        }
+
+        sequence.push(WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)), pos));
+        Ok(WithPos::new(Expr::Sequence(sequence), pos))
     }
 
-    fn rec_ty(&mut self) -> Result<TyWithPos> {
+    fn struct_ty(&mut self) -> Result<TyWithPos> {
         let pos = eat!(self, OpenCurly);
         let fields = fields!(self, CloseCurly);
         eat!(self, CloseCurly);
-        Ok(WithPos::new(Ty::Record {
+        Ok(WithPos::new(Ty::Struct {
             fields,
         }, pos))
     }
@@ -575,7 +605,7 @@ impl<'a, R: Read> Parser<'a, R> {
     fn ty(&mut self) -> Result<TyWithPos> {
         match self.peek()?.token {
             Array => self.arr_ty(),
-            OpenCurly => self.rec_ty(),
+            OpenCurly => self.struct_ty(),
             Ident(_) => {
                 let type_name;
                 let pos = eat!(self, Ident, type_name);

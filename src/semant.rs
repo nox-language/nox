@@ -38,7 +38,7 @@ use ast::{
     FuncDeclarationWithPos,
     Operator,
     OperatorWithPos,
-    RecordFieldWithPos,
+    StructFieldWithPos,
     Ty,
     TypeDecWithPos,
     TyWithPos,
@@ -189,7 +189,7 @@ impl<'a> SemanticAnalyzer<'a> {
         let expected = self.actual_ty(expected);
         let unexpected = self.actual_ty(unexpected);
         if expected != unexpected && expected != Type::Error && unexpected != Type::Error {
-            if let Type::Record(_, _, _) = expected {
+            if let Type::Struct(_, _, _) = expected {
                 if unexpected == Type::Nil {
                     return;
                 }
@@ -240,7 +240,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     self.check_types(&typ, &init.typ, ident.pos);
                 }
                 else if init.typ == Type::Nil {
-                    return self.add_error(Error::RecordType { pos: declaration.pos }, None);
+                    return self.add_error(Error::StructType { pos: declaration.pos }, None);
                 }
                 else if init.typ == Type::Error {
                     return None;
@@ -391,18 +391,18 @@ impl<'a> SemanticAnalyzer<'a> {
                     typ: Type::Bool,
                 }
             },
-            Expr::Record { mut fields, typ } => {
+            Expr::Struct { mut fields, typ } => {
                 let ty = self.get_type(&typ, AddError);
                 println!("{:?}", ty);
                 let mut field_exprs = vec![];
                 match ty {
-                    Type::Record(_, ref type_fields, _) => {
+                    Type::Struct(_, ref type_fields, _) => {
                         for &(type_field_name, ref type_field) in type_fields {
                             if let Some(index) = fields.iter().position(|field| field.node.ident == type_field_name) {
                                 let field = fields.remove(index);
                                 let expr = self.trans_exp(field.node.expr);
                                 self.check_types(&type_field, &expr.typ, expr.pos);
-                                field_exprs.push(WithPos::new(tast::RecordField { expr, ident: field.node.ident }, field.pos));
+                                field_exprs.push(WithPos::new(tast::StructField { expr, ident: field.node.ident }, field.pos));
                             }
                             else {
                                 return self.missing_field(type_field_name, &typ);
@@ -420,12 +420,12 @@ impl<'a> SemanticAnalyzer<'a> {
                     Type::Error => (),
                     _ =>
                         return self.add_error(Error::UnexpectedType {
-                            kind: "record".to_string(),
+                            kind: "struct".to_string(),
                             pos: typ.pos,
                         }, exp_type_error()),
                 }
                 TypedExpr {
-                    expr: tast::Expr::Record { fields: field_exprs, typ },
+                    expr: tast::Expr::Struct { fields: field_exprs, typ },
                     pos: expr.pos,
                     typ: ty,
                 }
@@ -558,13 +558,13 @@ impl<'a> SemanticAnalyzer<'a> {
                 Type::Array(Box::new(ty), size)
             },
             Ty::Name { ref ident } => self.get_type(ident, AddError),
-            Ty::Record { ref fields } => {
-                let mut record_fields = vec![];
+            Ty::Struct { ref fields } => {
+                let mut struct_fields = vec![];
                 for field in fields {
                     let typ = self.get_type(&field.node.typ, AddError);
-                    record_fields.push((field.node.name, typ));
+                    struct_fields.push((field.node.name, typ));
                 }
-                Type::Record(symbol, record_fields, Unique::new())
+                Type::Struct(symbol, struct_fields, Unique::new())
             },
         }
     }
@@ -574,23 +574,23 @@ impl<'a> SemanticAnalyzer<'a> {
             Var::Field { ident, this } => {
                 let this = Box::new(self.trans_var(*this));
                 match this.typ {
-                    Type::Record(record_type, ref fields, _) => {
-                        for &(name, ref typ) in fields {
+                    Type::Struct(struct_type, ref fields, _) => {
+                        for (index, &(name, ref typ)) in fields.iter().enumerate() {
                             if name == ident.node {
                                 return TypedVar {
                                     pos: var.pos,
                                     typ: typ.clone(),
                                     var: tast::Var::Field {
-                                        ident: ident.clone(),
+                                        index,
                                         this,
                                     },
                                 };
                             }
                         }
-                        self.unexpected_field(&ident, ident.pos, record_type)
+                        self.unexpected_field(&ident, ident.pos, struct_type)
                     },
                     typ =>
-                        return self.add_error(Error::NotARecord {
+                        return self.add_error(Error::NotAStruct {
                             pos: this.pos,
                             typ: typ.to_string(),
                         }, var_type_error()),
@@ -645,7 +645,7 @@ impl<'a> SemanticAnalyzer<'a> {
         }, ())
     }
 
-    fn extra_field(&mut self, field: &RecordFieldWithPos, typ: &SymbolWithPos) -> TypedExpr {
+    fn extra_field(&mut self, field: &StructFieldWithPos, typ: &SymbolWithPos) -> TypedExpr {
         let ident = self.env.type_name(field.node.ident);
         let struct_name = self.env.type_name(typ.node);
         self.add_error(Error::ExtraField {

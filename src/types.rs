@@ -29,7 +29,7 @@ pub enum Type {
     Bool,
     Int32,
     String,
-    Record(Symbol, Vec<(Symbol, Type)>, Unique),
+    Struct(Symbol, Vec<(Symbol, Type)>, Unique),
     Array(Box<Type>, usize),
     Nil,
     Unit,
@@ -44,7 +44,7 @@ impl Display for Type {
                 Bool => "bool".to_string(),
                 Int32 => "int32".to_string(),
                 String => "string".to_string(),
-                Record(_, ref types, _) => {
+                Struct(_, ref types, _) => {
                     write!(formatter, "{{")?;
                     if let Some((last_type, types)) = types.split_last() {
                         for &(_, ref typ) in types {

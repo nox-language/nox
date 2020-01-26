@@ -75,8 +75,8 @@ pub enum Expr {
         oper: OperatorWithPos,
         right: Box<TypedExpr>,
     },
-    Record {
-        fields: Vec<TypedRecordField>,
+    Struct {
+        fields: Vec<TypedStructField>,
         typ: SymbolWithPos,
     },
     Sequence(Vec<TypedExpr>),
@@ -119,17 +119,17 @@ pub struct FuncDeclaration {
 pub type TypedFuncDeclaration = WithPos<FuncDeclaration>;
 
 #[derive(Clone, Debug)]
-pub struct RecordField {
+pub struct StructField {
     pub expr: TypedExpr,
     pub ident: Symbol,
 }
 
-pub type TypedRecordField = WithPos<RecordField>;
+pub type TypedStructField = WithPos<StructField>;
 
 #[derive(Clone, Debug)]
 pub enum Var {
     Field {
-        ident: SymbolWithPos,
+        index: usize,
         this: Box<TypedVar>,
     },
     Global {

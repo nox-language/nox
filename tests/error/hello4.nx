@@ -1,9 +1,9 @@
 ( variable
 ; -variable[0]
-; MyRecord {
+; MyStruct {
     myField = 10
 }
-; MyRecord
+; MyStruct
     { myField = 10
     , secondField = 42
     }

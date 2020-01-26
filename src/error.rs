@@ -63,11 +63,11 @@ pub enum Error {
     },
     Msg(String),
     Multi(Vec<Error>),
-    NotARecord {
+    NotAStruct {
         pos: Pos,
         typ: String,
     },
-    RecordType {
+    StructType {
         pos: Pos,
     },
     Type {
@@ -129,9 +129,9 @@ impl Display for Error {
                 }
                 Ok(())
             },
-            NotARecord { pos, ref typ } =>
-                write!(formatter, "{} Type `{}` is not a record type at {:?}", pos, typ, pos),
-            Error::RecordType { pos } =>
+            NotAStruct { pos, ref typ } =>
+                write!(formatter, "{} Type `{}` is not a struct type at {:?}", pos, typ, pos),
+            Error::StructType { pos } =>
                 write!(formatter, "{} Expecting type when value is nil at {:?}", pos, pos),
             Error::Type { ref expected, pos, ref unexpected } =>
                 write!(formatter, "{}, Unexpected type {}, expecting {} at {:?}", pos, unexpected, expected, pos),

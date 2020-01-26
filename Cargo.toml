@@ -4,8 +4,7 @@ version = "0.1.0"
 authors = ["Antoni Boucher <bouanto@zoho.com>"]
 
 [dependencies]
-#rlvm = { git = "ssh://git@framagit.org:/antoyo/rlvm.git" } # "0.0.2"
-rlvm = { path = "/home/antoni/Ordinateur/OpenSource/rlvm" }
+rlvm = { git = "ssh://git@framagit.org:/antoyo/rlvm.git" } # "0.0.2"
 
 [lib]
 name = "runtime"
