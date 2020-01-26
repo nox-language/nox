@@ -277,6 +277,9 @@ impl Gen {
 
                     self.builder.position_at_end(&then_basic_block);
 
+                    let then_is_unit = then.typ == Type::Unit;
+                    let llvm_type = to_llvm_type(&then.typ);
+                    let then_value = self.expr(*then);
 
                     let new_then_basic_block = self.builder.get_insert_block().expect("new then basic block");
 
@@ -291,19 +294,18 @@ impl Gen {
                     self.builder.position_at_end(&merge_basic_block);
 
                     let result =
-                        match then.typ {
-                            Type::Unit => self.expr(dummy_nil()),
-                            _ => {
-                                let phi = self.builder.phi(to_llvm_type(&then.typ), "result");
-                                let then_value = self.expr(*then);
-                                if let Some(else_value) = else_value {
-                                    phi.add_incoming(&[(&then_value, &new_then_basic_block), (&else_value, &new_else_basic_block)]);
-                                }
-                                else {
-                                    phi.add_incoming(&[(&then_value, &new_then_basic_block)]);
-                                }
-                                phi
-                            },
+                        if then_is_unit {
+                            then_value
+                        }
+                        else {
+                            let phi = self.builder.phi(llvm_type, "result");
+                            if let Some(else_value) = else_value {
+                                phi.add_incoming(&[(&then_value, &new_then_basic_block), (&else_value, &new_else_basic_block)]);
+                            }
+                            else {
+                                phi.add_incoming(&[(&then_value, &new_then_basic_block)]);
+                            }
+                            phi
                         };
 
                     self.builder.position_at_end(&start_basic_block);
