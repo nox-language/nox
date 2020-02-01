@@ -44,7 +44,6 @@ pub enum Entry {
         typ: Type,
         value: Value,
     },
-    Error,
 }
 
 pub struct Env {
@@ -55,6 +54,8 @@ pub struct Env {
 impl Env {
     pub fn new(strings: &Rc<Strings>, module: &Module) -> Self {
         let mut type_env = Symbols::new(Rc::clone(strings));
+        let bool_symbol = type_env.symbol("bool");
+        type_env.enter(bool_symbol, Type::Bool);
         let int_symbol = type_env.symbol("int");
         type_env.enter(int_symbol, Type::Int32);
         let string_symbol = type_env.symbol("string");
@@ -75,9 +76,9 @@ impl Env {
 
     fn add_function(&mut self, name: &str, parameters: Vec<Type>, result: Type, module: &Module) {
         let symbol = self.var_env.symbol(name);
-        let result_type = gen::to_llvm_type(&result);
+        let result_type = gen::to_llvm_type(&result).expect("llvm type");
         let param_types: Vec<_> = parameters.iter()
-            .map(|typ| gen::to_llvm_type(&typ))
+            .map(|typ| gen::to_llvm_type(&typ).expect("llvm type"))
             .collect();
         let function_type = types::function::new(result_type, &param_types, false);
         let llvm_function = module.add_function(name, function_type);
@@ -117,10 +118,6 @@ impl Env {
 
     pub fn type_name(&self, symbol: Symbol) -> String {
         self.type_env.name(symbol)
-    }
-
-    pub fn type_symbol(&mut self, string: &str) -> Symbol {
-        self.type_env.symbol(string)
     }
 
     pub fn var_name(&self, symbol: Symbol) -> String {

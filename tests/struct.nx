@@ -1,4 +1,4 @@
-type Point = {
+type Point = Point {
     x: int,
     y: int
 }

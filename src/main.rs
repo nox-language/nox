@@ -20,10 +20,13 @@
  */
 
 /*
+ * FIXME: do not show type errors with invalid types.
+ * FIXME: do not show type errors for undefined variable.
+ * TODO: use && instead of & for boolean comparison.
  * FIXME: global array does not compile.
  * TODO: change the struct definition syntax to `struct Name { … }`?
  * TODO: allow leading commas (for fields in struct, in arrays, parameters).
- * TODO: functions without parameters do not need parentheses?
+ * TODO: functions call do not need parentheses?
  * TODO: error on missing a main function.
  * TODO: call exit in main (that requires writing an alternative runtime).
  */

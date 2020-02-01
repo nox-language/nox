@@ -214,13 +214,6 @@ impl<'a> SemanticAnalyzer<'a> {
         }
     }
 
-    fn get_var(&mut self, symbol: &SymbolWithPos) -> Entry {
-        if let Some(entry) = self.env.look_var(symbol.node) {
-            return entry.clone();
-        }
-        self.undefined_identifier(symbol)
-    }
-
     fn trans_dec(&mut self, declaration: DeclarationWithPos) -> Option<TypedDeclaration> {
         match declaration.node {
             Declaration::Function(function) => Some(self.trans_fun(function)),
@@ -228,7 +221,6 @@ impl<'a> SemanticAnalyzer<'a> {
                 self.check_duplicate_types(&type_declaration);
                 let name = &type_declaration.node.name;
                 let new_type = self.trans_ty(&type_declaration.node.ty);
-                println!("New type: {:?}", new_type);
                 self.env.enter_type(name.node, new_type);
 
                 Some(WithPos::new(tast::Declaration::Type(type_declaration), declaration.pos))
@@ -245,6 +237,7 @@ impl<'a> SemanticAnalyzer<'a> {
                         return self.add_error(Error::StructType { pos: declaration.pos }, None);
                     }
                     else if init.typ == Type::Error {
+                        // TODO: print error here?
                         return None;
                     }
                     else {
@@ -398,7 +391,6 @@ impl<'a> SemanticAnalyzer<'a> {
             },
             Expr::Struct { mut fields, typ } => {
                 let ty = self.get_type(&typ, AddError);
-                println!("{:?}", ty);
                 let mut field_exprs = vec![];
                 match ty {
                     Type::Struct(_, ref type_fields, _) => {
@@ -680,15 +672,6 @@ impl<'a> SemanticAnalyzer<'a> {
             item: "function".to_string(),
             pos,
         }, exp_type_error())
-    }
-
-    fn undefined_identifier(&mut self, symbol: &SymbolWithPos) -> Entry {
-        let ident = self.env.type_name(symbol.node);
-        self.add_error(Error::Undefined {
-            ident,
-            item: "identifier".to_string(),
-            pos: symbol.pos,
-        }, Entry::Error)
     }
 
     fn undefined_type(&mut self, symbol: &SymbolWithPos) -> Type {

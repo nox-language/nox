@@ -535,10 +535,8 @@ impl<'a, R: Read> Parser<'a, R> {
         Ok(WithPos::new(Expr::Sequence(sequence), pos))
     }
 
-    fn struct_ty(&mut self) -> Result<TyWithPos> {
-        let typ;
-        let pos = eat!(self, Ident, typ);
-        let typ = WithPos::new(self.symbols.symbol(&typ), pos);
+    fn struct_ty(&mut self, typ: Symbol, pos: Pos) -> Result<TyWithPos> {
+        let typ = WithPos::new(typ, pos);
         eat!(self, OpenCurly);
         let fields = fields!(self, CloseCurly);
         eat!(self, CloseCurly);
@@ -607,16 +605,20 @@ impl<'a, R: Read> Parser<'a, R> {
     fn ty(&mut self) -> Result<TyWithPos> {
         match self.peek()?.token {
             OpenSquare => self.arr_ty(),
-            OpenCurly => self.struct_ty(),
             Ident(_) => {
                 let type_name;
                 let pos = eat!(self, Ident, type_name);
                 let ident = self.symbols.symbol(&type_name);
-                Ok(WithPos::new(Ty::Name {
-                    ident: WithPos::new(ident, pos),
-                }, pos))
+                if self.peek()?.token == OpenCurly {
+                    self.struct_ty(ident, pos)
+                }
+                else {
+                    Ok(WithPos::new(Ty::Name {
+                        ident: WithPos::new(ident, pos),
+                    }, pos))
+                }
             },
-            _ => Err(self.unexpected_token("array, { or identifier")?),
+            _ => Err(self.unexpected_token("array or identifier")?),
         }
     }
 

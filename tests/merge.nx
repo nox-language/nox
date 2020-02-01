@@ -1,70 +1,67 @@
-let type any = {any: int}
-    var buffer := getchar()
+type Any = Any {any: bool}
+type List = List {first: int, rest: List}
 
-    function readint(any: any) : int =
-        let var i := 0
-            function isdigit(s : string) : int =
-                ord(buffer) >= ord("0") & ord(buffer) <= ord("9")
-        in
-            while buffer = " " | buffer = "\n" do
-                buffer := getchar();
-            any.any := isdigit(buffer);
-            while isdigit(buffer) do (
-                i := i * 10 + ord(buffer) - ord("0");
-                buffer := getchar()
-            );
-            i
-        end
+fun readint(any: Any) : int = (
+    var i := 0;
+    fun isdigit(s : string) : bool =
+        ord(buffer) >= ord("0") & ord(buffer) <= ord("9");
+    while buffer = " " | buffer = "\n" do
+        buffer := getchar();
+    any.any := isdigit(buffer);
+    while isdigit(buffer) do (
+        i := i * 10 + ord(buffer) - ord("0");
+        buffer := getchar()
+    );
+    i
+)
 
-    type list = {first: int, rest: list}
+fun readlist() : List = (
+    var any := Any { any = 0 };
+    var i := readint(any);
+    if any.any then
+        List { first = i, rest = readlist() }
+    else (
+        buffer := getchar();
+        nil
+    )
+)
 
-    function readlist() : list =
-        let var any := any { any = 0 }
-            var i := readint(any)
-        in
-            if any.any then
-                list { first = i, rest = readlist() }
-            else (
-                buffer := getchar();
-                nil
-            )
-        end
+fun merge(a: List, b: List) : List =
+    if a = nil then
+        b
+    else if b = nil then
+        a
+    else if a.first < b.first then
+        List { first = a.first, rest = merge(a.rest, b) }
+    else
+        List { first = b.first, rest = merge(a, b.rest) }
 
-    function merge(a: list, b: list) : list =
-        if a = nil then
-            b
-        else if b = nil then
-            a
-        else if a.first < b.first then
-            list { first = a.first, rest = merge(a.rest, b) }
-        else
-            list { first = b.first, rest = merge(a, b.rest) }
+fun printint(i: int) = (
+    fun f(i: int) =
+        if i > 0 then (
+            f(i / 10);
+            print(chr(i - i / 10 * 10 + ord("0")))
+        );
+    if i < 0 then (
+        print("-");
+        f(-i)
+    )
+    else if i > 0 then
+        f(i)
+    else
+        print("0")
+)
 
-    function printint(i: int) =
-        let function f(i: int) =
-            if i > 0 then (
-                f(i / 10);
-                print(chr(i - i / 10 * 10 + ord("0")))
-            )
-        in
-            if i < 0 then (
-                print("-");
-                f(-i)
-            )
-            else if i > 0 then
-                f(i)
-            else
-                print("0")
-        end
+fun printlist(l: List) =
+    if l = nil then
+        print("\n")
+    else (
+        printint(l.first);
+        print(" ");
+        printlist(l.rest)
+    )
 
-    function printlist(l: list) =
-        if l = nil then
-            print("\n")
-        else (
-            printint(l.first);
-            print(" ");
-            printlist(l.rest)
-        )
-in
+fun main() = (
+    var buffer := getchar();
     printlist(merge(readlist(), readlist()))
-end
+)

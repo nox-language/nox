@@ -33,7 +33,6 @@ use rlvm::{
     IntPredicate,
     Module,
     ModulePassManager,
-    RealPredicate,
     RelocMode,
     Target,
     Value,
@@ -59,44 +58,31 @@ use tast::{
 };
 use types::Type;
 
-fn to_real_op(op: Operator) -> RealPredicate {
-    match op {
-        Operator::Plus => unimplemented!(),
-        Operator::Minus => unimplemented!(),
-        Operator::Times => unimplemented!(),
-        Operator::And => unimplemented!(),
-        Operator::Or => unimplemented!(),
-        Operator::Divide => unimplemented!(),
-        _ => panic!("{:?} is not a binary operator", op),
-    }
+pub fn to_llvm_type(typ: &Type) -> Option<rlvm::types::Type> {
+    let typ =
+        match *typ {
+            Type::Bool => types::integer::int1(),
+            Type::Int32 => types::integer::int32(), // TODO: int64?
+            Type::String => types::pointer::new(types::int8(), 0),
+            Type::Struct(_, ref fields, _) => {
+                let types: Option<Vec<_>> = fields.iter().map(|(_symbol, typ)| to_llvm_type(typ)).collect();
+                types::structure::new(&types?, false)
+            },
+            Type::Array(ref typ, size) => types::array::array(to_llvm_type(typ)?, size),
+            Type::Nil => types::integer::int32(), // TODO: int64 or pointer type?
+            Type::Unit => types::void(),
+            Type::Name(ref _symbol, ref _type) => unimplemented!(),
+            Type::Error => return None,
+        };
+    Some(typ)
 }
 
-fn to_real_rel_op(op: Operator) -> RealPredicate {
-    match op {
-        Operator::Equal => unimplemented!(),
-        Operator::Ge => unimplemented!(),
-        Operator::Gt => unimplemented!(),
-        Operator::Le => unimplemented!(),
-        Operator::Lt => unimplemented!(),
-        Operator::Neq => unimplemented!(),
-        _ => panic!("{:?} is not a relational operator or is not used", op),
-    }
-}
-
-pub fn to_llvm_type(typ: &Type) -> rlvm::types::Type {
-    match *typ {
-        Type::Bool => types::integer::int1(),
-        Type::Int32 => types::integer::int32(), // TODO: int64?
-        Type::String => types::pointer::new(types::int8(), 0),
-        Type::Struct(_, ref fields, _) => {
-            let types: Vec<_> = fields.iter().map(|(_symbol, typ)| to_llvm_type(typ)).collect();
-            types::structure::new(&types, false)
-        },
-        Type::Array(ref typ, size) => types::array::array(to_llvm_type(typ), size),
-        Type::Nil => types::integer::int32(), // TODO: int64 or pointer type?
-        Type::Unit => types::void(),
-        Type::Name(ref _symbol, ref _type) => unimplemented!(),
-        Type::Error => unreachable!("error to llvm type"),
+fn to_llvm_type_or_dummy(typ: &Type) -> rlvm::types::Type {
+    match to_llvm_type(typ) {
+        Some(typ) => typ,
+        // Since this is called in the semantic analysis, return a dummy type to be able to
+        // show the error from the semantic analysis.
+        None => to_llvm_type(&Type::Int32).expect("llvm type"),
     }
 }
 
@@ -105,14 +91,16 @@ pub fn create_entry_block_alloca(function: &Function, variable_name: &str, typ: 
     let instruction = basic_block.get_first_instruction();
     let builder = Builder::new();
     builder.position(&basic_block, &instruction);
-    builder.alloca(to_llvm_type(typ), variable_name)
+    let typ = to_llvm_type_or_dummy(typ);
+    builder.alloca(typ, variable_name)
 }
 
 pub fn function(module: &Module, result_type: &Type, params: &[Type], name: Symbol, strings: &Rc<Strings>) -> Function {
     let param_types: Vec<_> = params.iter()
-        .map(|typ| to_llvm_type(&typ))
+        .map(|typ| to_llvm_type_or_dummy(&typ))
         .collect();
-    let function_type = types::function::new(to_llvm_type(&result_type), &param_types, false);
+    let result_type = to_llvm_type_or_dummy(&result_type);
+    let function_type = types::function::new(result_type, &param_types, false);
     let function = module.add_function(&strings.get(name).expect("symbol"), function_type);
     function.append_basic_block("entry");
     function
@@ -204,7 +192,7 @@ impl Gen {
         let value =
             match expr.expr {
                 Expr::Array { init, size } => {
-                    let typ = types::array::array(to_llvm_type(&init.typ), size);
+                    let typ = types::array::array(to_llvm_type(&init.typ).expect("llvm type"), size);
                     self.builder.alloca(typ, "array")
                 },
                 Expr::Assign { expr, var } => {
@@ -219,7 +207,7 @@ impl Gen {
                                 Var::Simple { value } => value,
                                 Var::Subscript { expr, this } => {
                                     let index = self.expr(*expr);
-                                    let llvm_type = to_llvm_type(&this.typ);
+                                    let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
                                     let this = self.variable_address(*this);
                                     self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
                                 },
@@ -232,7 +220,7 @@ impl Gen {
                         let variable =
                             match var.var {
                                 Var::Field { index, this } => {
-                                    let llvm_type = to_llvm_type(&this.typ);
+                                    let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
                                     let this = self.variable_address(*this);
                                     self.builder.struct_gep(&llvm_type, &this, index, "field")
                                 },
@@ -241,7 +229,7 @@ impl Gen {
                                 Var::Subscript { expr, this } => {
                                     // TODO: remove this code duplicate?
                                     let index = self.expr(*expr);
-                                    let llvm_type = to_llvm_type(&this.typ);
+                                    let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
                                     let this = self.variable_address(*this);
                                     self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
                                 },
@@ -278,7 +266,7 @@ impl Gen {
                     self.builder.position_at_end(&then_basic_block);
 
                     let then_is_unit = then.typ == Type::Unit;
-                    let llvm_type = to_llvm_type(&then.typ);
+                    let llvm_type = to_llvm_type(&then.typ).expect("llvm type");
                     let then_value = self.expr(*then);
 
                     let new_then_basic_block = self.builder.get_insert_block().expect("new then basic block");
@@ -356,8 +344,8 @@ impl Gen {
                     self.builder.global_string_ptr(value, "string")
                 },
                 Expr::Struct { fields, .. } => {
-                    let fields: Vec<_> = fields.iter().map(|field| to_llvm_type(&field.node.expr.typ)).collect();
-                    let typ = types::structure::new(&fields, false);
+                    let fields: Option<Vec<_>> = fields.iter().map(|field| to_llvm_type(&field.node.expr.typ)).collect();
+                    let typ = types::structure::new(&fields.expect("llvm types"), false);
                     self.builder.alloca(typ, "struct")
                 },
                 Expr::Variable(variable) => self.variable(variable),
@@ -438,10 +426,10 @@ impl Gen {
     }
 
     fn variable(&mut self, variable: TypedVar) -> Value {
-        let typ = to_llvm_type(&variable.typ);
+        let typ = to_llvm_type(&variable.typ).expect("llvm type");
         match variable.var {
             Var::Field { index, this } => {
-                let llvm_type = to_llvm_type(&this.typ);
+                let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
                 let this = self.variable_address(*this);
                 let pointer = self.builder.struct_gep(&llvm_type, &this, index, "field");
                 self.builder.load(typ, &pointer, "")
@@ -453,7 +441,7 @@ impl Gen {
                     _ => self.builder.load(typ, &value, "")
                 },
             Var::Subscript { this, expr } => {
-                let llvm_type = to_llvm_type(&this.typ);
+                let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
                 let this = self.variable_address(*this);
                 let index = self.expr(*expr);
                 let pointer = self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index");
@@ -468,7 +456,7 @@ impl Gen {
             Var::Global { .. } => unimplemented!(),
             Var::Simple { value } => value,
             Var::Subscript { this, expr } => {
-                let llvm_type = to_llvm_type(&variable.typ);
+                let llvm_type = to_llvm_type(&variable.typ).expect("llvm type");
                 let this = self.variable_address(*this);
                 let index = self.expr(*expr);
                 self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")

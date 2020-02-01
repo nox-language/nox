@@ -1,39 +1,38 @@
-let type tree = {key: string, left: tree, right: tree}
-    function prettyprint(tree: tree): string =
-        let var output := ""
-            function write(s: string) =
-                output := concat(output, s)
-            function show(n: int, t: tree) =
-                let function indent(s: string) =
-                    (for i := 0 to n
-                        do write(" ");
-                        output := concat(output, s);
-                        write("\n"))
-                in
-                    if t = nil then
-                        indent(".")
-                    else (
-                        indent(t.key);
-                        show(n + 4, t.left);
-                        show(n + 4, t.right)
-                    )
-                end
-        in
-            show(0, tree);
-            output
-        end
-in
-    print(prettyprint(tree { key = "5", left = tree {
-        key = "2", left = tree {
+type Tree = Tree {key: string, left: Tree, right: Tree}
+
+fun prettyprint(tree: Tree): string = (
+    var output := "";
+    fun write(s: string) =
+        output := concat(output, s);
+    fun show(n: int, t: Tree) = (
+        fun indent(s: string) =
+            (for i := 0 to n
+                do write(" ");
+                output := concat(output, s);
+                write("\n"));
+        if t = nil then
+            indent(".")
+        else (
+            indent(t.key);
+            show(n + 4, t.left);
+            show(n + 4, t.right)
+        )
+    );
+    show(0, tree);
+    output
+)
+
+fun main() =
+    print(prettyprint(Tree { key = "5", left = Tree {
+        key = "2", left = Tree {
             key = "1", left = nil, right = nil
-        }, right = tree {
+        }, right = Tree {
             key = "3", left = nil, right = nil
         }
-    }, right = tree {
-        key = "7", left = tree {
+    }, right = Tree {
+        key = "7", left = Tree {
             key = "6", left = nil, right = nil
-        }, right = tree {
+        }, right = Tree {
             key = "10", left = nil, right = nil
         }
     }}))
-end

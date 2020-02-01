@@ -24,7 +24,7 @@ use std::fmt::{self, Display, Formatter};
 use position::Pos;
 use self::Tok::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Tok {
     Ampersand,
     Array,
