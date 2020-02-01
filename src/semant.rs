@@ -34,6 +34,7 @@ use ast::{
     DeclarationWithPos,
     Expr,
     ExprWithPos,
+    ExternFuncDeclarationWithPos,
     FieldWithPos,
     FuncDeclarationWithPos,
     Operator,
@@ -216,6 +217,10 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn trans_dec(&mut self, declaration: DeclarationWithPos) -> Option<TypedDeclaration> {
         match declaration.node {
+            Declaration::Extern(prototype) => {
+                self.trans_extern(prototype);
+                None
+            },
             Declaration::Function(function) => Some(self.trans_fun(function)),
             Declaration::Type(type_declaration) => {
                 self.check_duplicate_types(&type_declaration);
@@ -473,6 +478,12 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
         }
+    }
+
+    fn trans_extern(&mut self, prototype: ExternFuncDeclarationWithPos) {
+        let result = prototype.node.result.map(|typ| self.trans_ty(&typ)).unwrap_or(Type::Unit);
+        let params = prototype.node.params.iter().map(|field| self.get_type(&field.node.typ, AddError)).collect();
+        self.env.add_function(&self.symbol(prototype.node.name), params, result, &self.module)
     }
 
     fn trans_fun(&mut self, function: FuncDeclarationWithPos) -> TypedDeclaration {

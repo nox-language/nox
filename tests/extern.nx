@@ -1,0 +1,3 @@
+extern fun puts(str: string)
+
+fun main() = puts("Hello")

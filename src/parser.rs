@@ -39,6 +39,8 @@ use ast::{
     DeclarationWithPos,
     Expr,
     ExprWithPos,
+    ExternFuncDeclaration,
+    ExternFuncDeclarationWithPos,
     Field,
     FieldWithPos,
     FuncDeclaration,
@@ -321,6 +323,23 @@ impl<'a, R: Read> Parser<'a, R> {
         // Convert for loop into while loop.
         let var = self.symbols.symbol(&var_name);
         Ok(for_loop(&mut self.symbols, var, body, var_pos, start, end, pos))
+    }
+
+    fn extern_(&mut self) -> Result<ExternFuncDeclarationWithPos> {
+        let pos = eat!(self, Extern);
+        eat!(self, Fun);
+        let func_name;
+        eat!(self, Ident, func_name);
+        let name = self.symbols.symbol(&func_name);
+        eat!(self, OpenParen);
+        let params = fields!(self, CloseParen);
+        eat!(self, CloseParen);
+        let result = self.optional_type()?;
+        Ok(WithPos::new(ExternFuncDeclaration {
+            name,
+            params,
+            result,
+        }, pos))
     }
 
     fn fun_dec(&mut self) -> Result<FuncDeclarationWithPos> {
@@ -705,14 +724,19 @@ impl<'a, R: Read> Parser<'a, R> {
                 Err(error) => return Err(error.clone()),
                 Ok(token) => {
                     match token {
+                        Extern => {
+                            let prototype = self.extern_()?;
+                            let pos = prototype.pos;
+                            declarations.push(WithPos::new(Declaration::Extern(prototype), pos));
+                        },
                         Fun => {
                             let function = self.fun_dec()?;
                             let pos = function.pos;
-                            declarations.push(WithPos::new(Declaration::Function(function), pos))
+                            declarations.push(WithPos::new(Declaration::Function(function), pos));
                         },
                         Type => declarations.push(self.ty_decs()?),
                         Var => declarations.push(self.var_dec(Global)?),
-                        _ => return Err(self.unexpected_token("function, type or var")?),
+                        _ => return Err(self.unexpected_token("fun, type or var")?),
                     }
                 },
             }

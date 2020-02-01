@@ -74,7 +74,7 @@ impl Env {
         env
     }
 
-    fn add_function(&mut self, name: &str, parameters: Vec<Type>, result: Type, module: &Module) {
+    pub fn add_function(&mut self, name: &str, parameters: Vec<Type>, result: Type, module: &Module) {
         let symbol = self.var_env.symbol(name);
         let result_type = gen::to_llvm_type(&result).expect("llvm type");
         let param_types: Vec<_> = parameters.iter()
@@ -125,7 +125,7 @@ impl Env {
     }
 }
 
-pub fn external_functions() -> HashMap<&'static str, (Vec<Type>, Type)> {
+fn external_functions() -> HashMap<&'static str, (Vec<Type>, Type)> {
     let mut functions = HashMap::new();
     functions.insert("print", (vec![Type::String], Type::Unit));
     functions.insert("printi", (vec![Type::Int32], Type::Unit));

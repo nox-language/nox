@@ -162,6 +162,7 @@ impl<R: Read> Lexer<R> {
                 "break" => Break,
                 "do" => Do,
                 "else" => Else,
+                "extern" => Extern,
                 "false" => False,
                 "for" => For,
                 "fun" => Fun,

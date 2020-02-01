@@ -24,6 +24,7 @@ use symbol::{Symbol, SymbolWithPos};
 
 #[derive(Clone, Debug)]
 pub enum Declaration {
+    Extern(ExternFuncDeclarationWithPos),
     Function(FuncDeclarationWithPos),
     Type(TypeDecWithPos),
     Variable {
@@ -102,6 +103,15 @@ pub struct FuncDeclaration {
 }
 
 pub type FuncDeclarationWithPos = WithPos<FuncDeclaration>;
+
+#[derive(Clone, Debug)]
+pub struct ExternFuncDeclaration {
+    pub name: Symbol,
+    pub params: Vec<FieldWithPos>,
+    pub result: Option<TyWithPos>,
+}
+
+pub type ExternFuncDeclarationWithPos = WithPos<ExternFuncDeclaration>;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Operator {
