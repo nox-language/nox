@@ -60,6 +60,16 @@ impl Pos {
     pub fn dummy() -> Self {
         Self::new(u32::MAX, u32::MAX, u64::MAX, 0, 0)
     }
+
+    pub fn grow(&self, pos: Pos) -> Self {
+        Pos {
+            byte: self.byte,
+            column: self.column,
+            file: self.file,
+            length: (pos.byte - self.byte) as usize + pos.length,
+            line: self.line,
+        }
+    }
 }
 
 impl Display for Pos {

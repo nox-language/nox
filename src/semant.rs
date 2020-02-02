@@ -63,7 +63,6 @@ use types::{Type, Unique};
 #[derive(PartialEq)]
 enum AddError {
     AddError,
-    DontAddError,
 }
 
 fn exp_type_error() -> TypedExpr {
@@ -235,7 +234,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 let typ =
                     if let Some(ref ident) = typ {
                         let typ = self.trans_ty(ident);
-                        self.check_types(&typ, &init.typ, ident.pos);
+                        self.check_types(&typ, &init.typ, init.pos);
                         Some(typ)
                     }
                     else if init.typ == Type::Nil {
@@ -482,7 +481,7 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn trans_extern(&mut self, prototype: ExternFuncDeclarationWithPos) {
         let result = prototype.node.result.map(|typ| self.trans_ty(&typ)).unwrap_or(Type::Unit);
-        let params = prototype.node.params.iter().map(|field| self.get_type(&field.node.typ, AddError)).collect();
+        let params = prototype.node.params.iter().map(|field| self.trans_ty(&field.node.typ)).collect();
         self.env.add_function(&self.symbol(prototype.node.name), params, result, &self.module)
     }
 
@@ -494,7 +493,7 @@ impl<'a> SemanticAnalyzer<'a> {
         let mut parameters = vec![];
         let mut param_set = HashSet::new();
         for param in &function.params {
-            parameters.push(self.get_type(&param.node.typ, AddError));
+            parameters.push(self.trans_ty(&param.node.typ));
             param_names.push(param.node.name);
             if !param_set.insert(param.node.name) {
                 self.duplicate_param(&param);
@@ -511,7 +510,7 @@ impl<'a> SemanticAnalyzer<'a> {
         let mut param_names = vec![];
         let mut parameters = vec![];
         for param in &function.params {
-            let typ = self.get_type(&param.node.typ, DontAddError);
+            let typ = self.trans_ty(&param.node.typ);
             parameters.push(typ.clone());
             param_names.push(param.node.name);
             }
@@ -568,7 +567,7 @@ impl<'a> SemanticAnalyzer<'a> {
             Ty::Struct { ref fields, ref typ } => {
                 let mut struct_fields = vec![];
                 for field in fields {
-                    let typ = self.get_type(&field.node.typ, AddError);
+                    let typ = self.trans_ty(&field.node.typ);
                     struct_fields.push((field.node.name, typ));
                 }
                 Type::Struct(typ.node, struct_fields, Unique::new())

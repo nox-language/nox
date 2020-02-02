@@ -89,7 +89,7 @@ pub type ExprWithPos = WithPos<Expr>;
 pub struct Field {
     pub escape: bool,
     pub name: Symbol,
-    pub typ: SymbolWithPos, // TODO: use Ty instead of Symbol.
+    pub typ: TyWithPos,
 }
 
 pub type FieldWithPos = WithPos<Field>;

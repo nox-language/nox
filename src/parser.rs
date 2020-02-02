@@ -148,7 +148,7 @@ impl<'a, R: Read> Parser<'a, R> {
                     _ => break,
                 };
             let right = Box::new(self.multiplicative_expr()?);
-            let pos = expr.pos;
+            let pos = expr.pos.grow(right.pos);
             expr = WithPos::new(Expr::Oper {
                 left: Box::new(expr),
                 oper,
@@ -239,11 +239,11 @@ impl<'a, R: Read> Parser<'a, R> {
                     _ => break,
                 }
             }
-            eat!(self, CloseParen);
+            let end_pos = eat!(self, CloseParen);
             Ok(WithPos::new(Expr::Call {
                 args,
                 function: symbol,
-            }, pos))
+            }, pos.grow(end_pos)))
         }
         else {
             match self.peek()?.token {
@@ -267,13 +267,11 @@ impl<'a, R: Read> Parser<'a, R> {
         let pos = eat!(self, Ident, field_name);
         let name = self.symbols.symbol(&field_name);
         eat!(self, Colon);
-        let type_name;
-        let type_pos = eat!(self, Ident, type_name);
-        let typ = self.symbols.symbol(&type_name);
+        let typ = self.ty()?;
         Ok(WithPos::new(Field {
             escape: false,
             name,
-            typ: WithPos::new(typ, type_pos),
+            typ,
         }, pos))
     }
 
@@ -281,10 +279,11 @@ impl<'a, R: Read> Parser<'a, R> {
         eat!(self, Dot);
         let field_name;
         let pos = eat!(self, Ident, field_name);
+        let var_pos = var.pos.grow(pos);
         let var = WithPos::new(Var::Field {
             ident: WithPos::new(self.symbols.symbol(&field_name), pos),
             this: Box::new(var),
-        }, pos);
+        }, var_pos);
         self.lvalue(var)
     }
 
@@ -372,19 +371,21 @@ impl<'a, R: Read> Parser<'a, R> {
         let condition = Box::new(self.expr()?);
         eat!(self, Then);
         let then = Box::new(self.expr()?);
-        let else_=
+        let (else_, end_pos) =
             if let Else = self.peek()?.token {
                 eat!(self, Else);
-                Some(Box::new(self.expr()?))
+                let expr = self.expr()?;
+                let end_pos = expr.pos;
+                (Some(Box::new(expr)), end_pos)
             }
             else {
-                None
+                (None, then.pos)
             };
         Ok(WithPos::new(Expr::If {
             else_,
             condition,
             then,
-        }, pos))
+        }, pos.grow(end_pos)))
     }
 
     fn int_lit(&mut self) -> Result<ExprWithPos> {
@@ -407,7 +408,7 @@ impl<'a, R: Read> Parser<'a, R> {
         while let Ok(&Ampersand) = self.peek_token() {
             let oper_pos = eat!(self, Ampersand);
             let right = Box::new(self.relational_expr()?);
-            let pos = expr.pos;
+            let pos = expr.pos.grow(right.pos);
             expr = WithPos::new(Expr::Oper {
                 left: Box::new(expr),
                 oper: WithPos::new(Operator::And, oper_pos),
@@ -422,7 +423,7 @@ impl<'a, R: Read> Parser<'a, R> {
         while let Ok(&Pipe) = self.peek_token() {
             let oper_pos = eat!(self, Pipe);
             let right = Box::new(self.logical_and_expr()?);
-            let pos = expr.pos;
+            let pos = expr.pos.grow(right.pos);
             expr = WithPos::new(Expr::Oper {
                 left: Box::new(expr),
                 oper: WithPos::new(Operator::Or, oper_pos),
@@ -467,7 +468,7 @@ impl<'a, R: Read> Parser<'a, R> {
                     _ => break,
                 };
             let right = Box::new(self.unary_expr()?);
-            let pos = expr.pos;
+            let pos = expr.pos.grow(right.pos);
             expr = WithPos::new(Expr::Oper {
                 left: Box::new(expr),
                 oper,
@@ -519,7 +520,8 @@ impl<'a, R: Read> Parser<'a, R> {
             eat!(self, Comma);
             fields.push(self.field_create()?)
         }
-        eat!(self, CloseCurly);
+        let end_pos = eat!(self, CloseCurly);
+        let pos = pos.grow(end_pos);
 
         // FIXME: not sure it's a good idea to do the transformations in the parser itself, because
         // the semantic analyzer could report errors in this generated code.
@@ -579,7 +581,7 @@ impl<'a, R: Read> Parser<'a, R> {
                     _ => break,
                 };
             let right = Box::new(self.additive_expr()?);
-            let pos = expr.pos;
+            let pos = expr.pos.grow(right.pos);
             expr = WithPos::new(Expr::Oper {
                 left: Box::new(expr),
                 oper,
@@ -597,7 +599,7 @@ impl<'a, R: Read> Parser<'a, R> {
             exprs.push(self.expr()?);
         }
         eat!(self, CloseParen);
-        let pos = exprs[0].pos;
+        let pos = exprs.last().unwrap().pos;
         Ok(WithPos::new(Expr::Sequence(exprs), pos))
     }
 
@@ -612,8 +614,8 @@ impl<'a, R: Read> Parser<'a, R> {
     fn subscript(&mut self, var: VarWithPos) -> Result<VarWithPos> {
         eat!(self, OpenSquare);
         let expr = Box::new(self.expr()?);
-        eat!(self, CloseSquare);
-        let pos = var.pos;
+        let end_pos = eat!(self, CloseSquare);
+        let pos = var.pos.grow(end_pos);
         let var = WithPos::new(Var::Subscript {
             expr,
             this: Box::new(var),
@@ -665,6 +667,7 @@ impl<'a, R: Read> Parser<'a, R> {
             Minus => {
                 let pos = eat!(self, Minus);
                 let expr = self.unary_expr()?;
+                let pos = pos.grow(expr.pos);
                 Ok(WithPos::new(Expr::Oper {
                     left: Box::new(WithPos::new(Expr::Int {
                         value: 0,
