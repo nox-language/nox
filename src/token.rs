@@ -75,7 +75,7 @@ pub enum Tok {
 
 #[derive(Debug)]
 pub struct Token {
-    pub start: Pos,
+    pub pos: Pos,
     pub token: Tok,
 }
 

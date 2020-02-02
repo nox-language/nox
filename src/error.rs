@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2017-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -19,12 +19,21 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::fmt::{self, Display, Formatter};
-use std::io;
+use std::cmp::{max, min};
+use std::fs::File;
+use std::io::{self, Read, Seek, SeekFrom};
 use std::result;
 
 use position::Pos;
 use self::Error::*;
+use symbol::Symbols;
+use terminal::{
+    BLUE,
+    BOLD,
+    END_BOLD,
+    RED,
+    RESET_COLOR,
+};
 use token::Tok;
 use types::Type;
 
@@ -104,51 +113,127 @@ pub enum Error {
     },
 }
 
-impl Display for Error {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        match *self {
-            BreakOutsideLoop { pos } =>
-                write!(formatter, "{} Break statement used outside of loop at {:?}", pos, pos),
-            CannotIndex { pos, ref typ } =>
-                write!(formatter, "{} Cannot index value of type `{}` at {:?}", pos, typ, pos),
-            Cycle { pos } =>
-                write!(formatter, "{} Type cycle detected at {:?}", pos, pos),
-            DuplicateParam { ref ident, pos } =>
-                write!(formatter, "{} Duplicate parameter name `{}` at {:?}", pos, ident, pos),
-            Eof => write!(formatter, "end of file"),
-            ExtraField { ref ident, pos, ref struct_name } =>
-                write!(formatter, "{} Extra field `{}` in struct of type `{}` at {:?}", pos, ident, struct_name, pos),
-            InvalidEscape { ref escape, pos } =>
-                write!(formatter, "{} Invalid escape \\{} at {:?}", pos, escape, pos),
-            MissingField { ref ident, pos, ref struct_name } =>
-                write!(formatter, "{} Missing field `{}` in struct of type `{}` at {:?}", pos, ident, struct_name, pos),
-            Msg(ref string) => write!(formatter, "{}", string),
-            Multi(ref errors) => {
-                for error in errors {
-                    writeln!(formatter, "{}", error)?;
-                }
-                Ok(())
-            },
-            NotAStruct { pos, ref typ } =>
-                write!(formatter, "{} Type `{}` is not a struct type at {:?}", pos, typ, pos),
-            Error::StructType { pos } =>
-                write!(formatter, "{} Expecting type when value is nil at {:?}", pos, pos),
-            Error::Type { ref expected, pos, ref unexpected } =>
-                write!(formatter, "{}, Unexpected type {}, expecting {} at {:?}", pos, unexpected, expected, pos),
-            Unclosed { pos, token } =>
-                write!(formatter, "{} Unclosed {} starting at {:?}", pos, token, pos),
-            Undefined { ref ident, ref item, pos } =>
-                write!(formatter, "{} Undefined {} `{}` at {:?}", pos, item, ident, pos),
-            UnexpectedField { ref ident, pos, ref struct_name } =>
-                write!(formatter, "{} Unexpected field `{}` in struct of type `{}` at {:?}", pos, ident, struct_name, pos),
-            UnexpectedToken { ref expected, pos, ref unexpected } =>
-                write!(formatter, "{} Unexpected token {}, expecting {} at {:?}", pos, unexpected, expected, pos),
-            UnexpectedType { ref kind, pos } =>
-                write!(formatter, "{} Expecting {} type at {:?}", pos, kind, pos),
-            UnknownToken { pos, ref start } =>
-                write!(formatter, "{} Unexpected start of token `{}` at {:?}", pos, start, pos),
+impl Error {
+    pub fn show(&self, symbols: &Symbols<()>) -> io::Result<()> {
+        if let Multi(ref errors) = *self {
+            for error in errors {
+                error.show(symbols)?;
+            }
+            return Ok(());
         }
+        eprint!("{}{}error: {}", BOLD, RED, RESET_COLOR);
+        match *self {
+            BreakOutsideLoop { pos } => {
+                eprintln!("Break statement used outside of loop{}", END_BOLD);
+                pos.show(symbols);
+            },
+            CannotIndex { pos, ref typ } => {
+                eprintln!("Cannot index value of type `{}`{}", typ, END_BOLD);
+                pos.show(symbols)
+            },
+            Cycle { pos } => {
+                eprintln!("Type cycle detected:{}", END_BOLD);
+                pos.show(symbols);
+            },
+            DuplicateParam { ref ident, pos } => {
+                eprintln!("Duplicate parameter name `{}`{}", ident, END_BOLD);
+                pos.show(symbols);
+            },
+            Eof => eprintln!("end of file"),
+            ExtraField { ref ident, pos, ref struct_name } => {
+                eprintln!("Extra field `{}` in struct of type `{}`{}", ident, struct_name, END_BOLD);
+                pos.show(symbols);
+            },
+            InvalidEscape { ref escape, pos } => {
+                eprintln!("Invalid escape \\{}{}", escape, END_BOLD);
+                pos.show(symbols);
+            },
+            MissingField { ref ident, pos, ref struct_name } => {
+                eprintln!("Missing field `{}` in struct of type `{}`{}", ident, struct_name, END_BOLD);
+                pos.show(symbols);
+            },
+            Msg(ref string) => eprintln!("{}", string),
+            Multi(_) => unreachable!(),
+            NotAStruct { pos, ref typ } => {
+                eprintln!("Type `{}` is not a struct type{}", typ, END_BOLD);
+                pos.show(symbols);
+                highlight_line(pos, symbols)?;
+            },
+            Error::StructType { pos } => {
+                eprintln!("Expecting type when value is nil{}", END_BOLD);
+                pos.show(symbols);
+            },
+            Error::Type { ref expected, pos, ref unexpected } => {
+                eprintln!("Unexpected type {}, expecting {}{}", unexpected, expected, END_BOLD);
+                pos.show(symbols);
+                highlight_line(pos, symbols)?;
+            },
+            Unclosed { pos, token } => {
+                eprintln!("Unclosed {} starting{}", token, END_BOLD);
+                pos.show(symbols);
+            },
+            Undefined { ref ident, ref item, pos } => {
+                eprintln!("Undefined {} `{}`{}", item, ident, END_BOLD);
+                pos.show(symbols);
+                highlight_line(pos, symbols)?;
+            },
+            UnexpectedField { ref ident, pos, ref struct_name } => {
+                eprintln!("Unexpected field `{}` in struct of type `{}`{}", ident, struct_name, END_BOLD);
+                pos.show(symbols);
+            },
+            UnexpectedToken { ref expected, pos, ref unexpected } => {
+                eprintln!("Unexpected token {}, expecting {}{}", unexpected, expected, END_BOLD);
+                pos.show(symbols);
+            },
+            UnexpectedType { ref kind, pos } => {
+                eprintln!("Expecting {} type{}", kind, END_BOLD);
+                pos.show(symbols);
+            },
+            UnknownToken { pos, ref start } => {
+                eprintln!("Unexpected start of token `{}`{}", start, END_BOLD);
+                pos.show(symbols);
+            },
+        }
+        eprintln!("");
+
+        Ok(())
     }
+}
+
+fn highlight_line(pos: Pos, symbols: &Symbols<()>) -> io::Result<()> {
+    let filename = symbols.name(pos.file);
+    let mut file = File::open(filename)?;
+    // TODO: support longer lines.
+    const LENGTH: i64 = 4096;
+    let mut buffer = [0; LENGTH as usize];
+    let start = max(0, pos.byte as i64 - LENGTH / 2);
+    file.seek(SeekFrom::Start(start as u64))?;
+    let size_read = file.read(&mut buffer)?;
+    let buffer = &buffer[..size_read];
+    let current_pos = min(pos.byte as usize - start as usize, buffer.len());
+    let start_of_line = buffer[..current_pos].iter().rposition(|byte| *byte == b'\n')
+        .map(|pos| pos + 1)
+        .unwrap_or(0);
+    let end_of_line = buffer[current_pos..].iter().position(|byte| *byte == b'\n')
+        .map(|pos| pos + current_pos)
+        .unwrap_or_else(|| buffer.len());
+    let line = &buffer[start_of_line..end_of_line];
+    let num_spaces = num_text_size(pos.line as i64);
+    let spaces = " ".repeat(num_spaces);
+    eprintln!("{}{}{} |", BOLD, BLUE, spaces);
+    eprintln!("{} |{}{} {}", pos.line, END_BOLD, RESET_COLOR, String::from_utf8_lossy(line));
+    let count = min(pos.column as usize, line.len());
+    let spaces_before_hint = " ".repeat(count);
+    let hint = "^".repeat(pos.length);
+    eprintln!("{}{}{} |{}{}{}{}", BOLD, BLUE, spaces, RED, spaces_before_hint, hint, RESET_COLOR);
+    Ok(())
+}
+
+pub fn num_text_size(num: i64) -> usize {
+    if num == 0 {
+        return 1;
+    }
+    1 + (num as f64).log10().floor() as usize
 }
 
 impl From<io::Error> for Error {

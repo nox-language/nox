@@ -46,6 +46,7 @@ mod position;
 mod semant;
 mod symbol;
 mod tast;
+mod terminal;
 mod token;
 mod types;
 
@@ -85,20 +86,23 @@ fn main() {
     initialize_all_asm_printers();
     initialize_native_target();
 
-    if let Err(error) = drive() {
-        eprintln!("{}", error);
+    let strings = Rc::new(Strings::new());
+    let mut symbols = Symbols::new(Rc::clone(&strings));
+    if let Err(error) = drive(strings, &mut symbols) {
+        if let Err(error) = error.show(&symbols) {
+            eprintln!("Error printing errors: {}", error);
+        }
     }
 }
 
-fn drive() -> Result<(), Error> {
+fn drive(strings: Rc<Strings>, symbols: &mut Symbols<()>) -> Result<(), Error> {
     let mut args = args();
     args.next();
     if let Some(filename) = args.next() {
-        let strings = Rc::new(Strings::new());
         let file = BufReader::new(File::open(&filename)?);
-        let lexer = Lexer::new(file);
-        let mut symbols = Symbols::new(Rc::clone(&strings));
-        let mut parser = Parser::new(lexer, &mut symbols);
+        let file_symbol = symbols.symbol(&filename);
+        let lexer = Lexer::new(file, file_symbol);
+        let mut parser = Parser::new(lexer, symbols);
         let ast = parser.parse()?;
         let module = Module::new_with_name("module");
         let mut env = Env::new(&strings, &module);

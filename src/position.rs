@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2017-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -20,30 +20,45 @@
  */
 
 use std::fmt::{self, Display, Debug, Formatter};
-use std::u32;
+use std::{u32, u64};
 
-#[derive(Clone, Copy)]
+use symbol::{Symbol, Symbols};
+use terminal::{
+    BLUE,
+    BOLD,
+    END_BOLD,
+    RESET_COLOR,
+};
+
+#[derive(Clone, Copy, Debug)]
 pub struct Pos {
+    pub byte: u64,
     pub column: u32,
+    pub file: Symbol,
+    pub length: usize,
     pub line: u32,
 }
 
-impl Debug for Pos {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "line {}, column {}", self.line, self.column)
+impl Pos {
+    pub fn show(&self, symbols: &Symbols<()>) {
+        let filename = symbols.name(self.file);
+        eprintln!("   {}{}-->{}{} {}:{}:{}", BOLD, BLUE, RESET_COLOR, END_BOLD, filename, self.line, self.column)
     }
 }
 
 impl Pos {
-    pub fn new(line: u32, column: u32) -> Self {
+    pub fn new(line: u32, column: u32, byte: u64, file: Symbol, length: usize) -> Self {
         Pos {
+            byte,
             column,
+            file,
+            length,
             line,
         }
     }
 
     pub fn dummy() -> Self {
-        Self::new(u32::MAX, u32::MAX)
+        Self::new(u32::MAX, u32::MAX, u64::MAX, 0, 0)
     }
 }
 

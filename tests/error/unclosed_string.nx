@@ -1,5 +1,4 @@
-let var N := 8
-in
+fun main() = (
+    var N := 8;
     print(")
-end
-
+)

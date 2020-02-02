@@ -123,3 +123,7 @@ Use latin1?
 Syntax genre int*l ptr pour les lifetimes? Regarder la syntax des noms de lock de Cyclone.
 
 Déréférencement de pointeur en suffixe genre ptr*.field avec probablement un autre caractère que * pour ne pas confondre avec la multiplication (pas sûr que ce soit possible si on a la surcharge d’opérateur, donc peut-être ptr.*.field comme Zig).
+
+== Standard library
+
+writev for atomic printf?

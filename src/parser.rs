@@ -74,11 +74,11 @@ macro_rules! eat {
                 match token.token {
                     $pat(var) => {
                         $var = var;
-                        token.start
+                        token.pos
                     },
                     tok => return Err(UnexpectedToken {
                         expected: stringify!($pat).to_lowercase(),
-                        pos: token.start,
+                        pos: token.pos,
                         unexpected: tok,
                     }),
                 }
@@ -93,10 +93,10 @@ macro_rules! eat {
         match $_self.token() {
             Ok(token) => {
                 match token.token {
-                    $pat => token.start,
+                    $pat => token.pos,
                     tok => return Err(UnexpectedToken {
                         expected: $expected,
-                        pos: token.start,
+                        pos: token.pos,
                         unexpected: tok,
                     }),
                 }
@@ -212,7 +212,7 @@ impl<'a, R: Read> Parser<'a, R> {
     }
 
     fn boolean(&mut self, value: bool) -> Result<ExprWithPos> {
-        let pos = self.token()?.start;
+        let pos = self.token()?.pos;
         Ok(WithPos::new(Expr::Bool(value), pos))
     }
 
@@ -770,7 +770,7 @@ impl<'a, R: Read> Parser<'a, R> {
         let token = self.token()?;
         Err(UnexpectedToken {
             expected: expected.to_string(),
-            pos: token.start,
+            pos: token.pos,
             unexpected: token.token,
         })
     }

@@ -24,8 +24,17 @@ use std::io::{Bytes, Read};
 use std::iter::Peekable;
 use std::result;
 
-use error::Error::{self, Eof, InvalidEscape, Msg, Unclosed, UnknownToken};
+use error::num_text_size;
+use error::Error::{
+    self,
+    Eof,
+    InvalidEscape,
+    Msg,
+    Unclosed,
+    UnknownToken,
+};
 use position::Pos;
+use symbol::Symbol;
 use token::{Tok, Token};
 use token::Tok::*;
 
@@ -38,11 +47,11 @@ pub struct Lexer<R: Read> {
 }
 
 impl<R: Read> Lexer<R> {
-    pub fn new(reader: R) -> Self {
+    pub fn new(reader: R, filename: Symbol) -> Self {
         Lexer {
             bytes_iter: reader.bytes().peekable(),
-            pos: Pos::new(1, 1),
-            saved_pos: Pos::new(1, 1),
+            pos: Pos::new(1, 1, 0, filename, 0),
+            saved_pos: Pos::new(1, 1, 0, filename, 0),
         }
     }
 
@@ -51,10 +60,14 @@ impl<R: Read> Lexer<R> {
             Some(Ok(b'\n')) => {
                 self.pos.line += 1;
                 self.pos.column = 1;
+                self.pos.byte += 1;
             },
             Some(Err(error)) => return Err(error.into()),
             None => return Err(Eof),
-            _ => self.pos.column += 1,
+            _ => {
+                self.pos.column += 1;
+                self.pos.byte += 1;
+            },
         }
         Ok(())
     }
@@ -156,6 +169,7 @@ impl<R: Read> Lexer<R> {
 
     fn identifier(&mut self) -> Result<Token> {
         let ident = self.take_while(|ch| ch.is_alphanumeric() || ch == '_')?;
+        let len = ident.len();
         let token =
             match ident.as_str() {
                 "array" => Array,
@@ -179,22 +193,28 @@ impl<R: Read> Lexer<R> {
                 "while" => While,
                 _ => Ident(ident),
             };
-        self.make_token(token)
+        self.make_token(token, len)
     }
 
     fn integer(&mut self) -> Result<Token> {
         let buffer = self.take_while(char::is_numeric)?;
         // The buffer only contains digit, hence unwrap().
-        self.make_token(Int(buffer.parse().unwrap()))
+        let num = buffer.parse().unwrap();
+        self.make_token(Int(num), num_text_size(num))
     }
 
     fn lesser_or_lesser_equal_or_not_equal(&mut self) -> Result<Token> {
         self.two_char_token(vec![('=', LesserOrEqual), ('>', NotEqual)], Lesser)
     }
 
-    fn make_token(&self, token: Tok) -> Result<Token> {
+    fn make_token(&self, token: Tok, length: usize) -> Result<Token> {
+        if length > 10000 {
+            panic!();
+        }
+        let mut pos = self.saved_pos;
+        pos.length = length;
         Ok(Token {
-            start: self.saved_pos,
+            pos,
             token,
         })
     }
@@ -204,10 +224,11 @@ impl<R: Read> Lexer<R> {
     }
 
     fn simple_token(&mut self, token: Tok) -> Result<Token> {
-        let start = self.pos;
+        let mut pos = self.pos;
+        pos.length = 1;
         self.advance()?;
         Ok(Token {
-            start,
+            pos,
             token,
         })
     }
@@ -245,7 +266,7 @@ impl<R: Read> Lexer<R> {
             self.token()
         }
         else {
-            self.make_token(Slash)
+            self.make_token(Slash, 1)
         }
     }
 
@@ -253,6 +274,7 @@ impl<R: Read> Lexer<R> {
         let result = {
             self.save_start();
             let mut string = String::new();
+            let start = self.current_pos().byte;
             self.eat('"')?;
             let mut ch = self.current_char()?;
             while ch != '"' {
@@ -274,7 +296,8 @@ impl<R: Read> Lexer<R> {
                 ch = self.current_char()?;
             }
             self.eat('"')?;
-            self.make_token(Str(string))
+            let len = self.current_pos().byte - start;
+            self.make_token(Str(string), len as usize)
         };
         match result {
             Err(Eof) => Err(Unclosed {
@@ -367,6 +390,6 @@ impl<R: Read> Lexer<R> {
             else {
                 default
             };
-        self.make_token(token)
+        self.make_token(token, 2)
     }
 }

@@ -1,4 +1,4 @@
-( variable
+fun main() = ( variable
 ; -variable[0]
 ; MyStruct {
     myField = 10
@@ -9,10 +9,8 @@
     }
 ; variable := 10
 ; variable[42] := 10
-; let var arrayOfInt := intArray [10] of 42
-  in
-    print("hello")
-  end
+; var arrayOfInt := [42; 10]
+; print("hello")
 ; if 10 then print("10")
 ; if 10 then print("10") else print("not 10")
 ; while 10 do (
