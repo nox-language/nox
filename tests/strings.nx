@@ -4,7 +4,7 @@ fun main() = (
     print("\n");
     print(chr(ord("a")));
     print("\n");
-    /*if "a" = "a" then
+    /*if "a" = "a" then // TODO: uncomment
         print("true\n");*/
     var char := getchar();
     print(char);

@@ -31,7 +31,7 @@
  * TODO: allow leading commas and semicolon (in arrays).
  * TODO: functions call do not need parentheses?
  * TODO: error on missing a main function.
- * TODO: call exit in main (that requires writing an alternative runtime).
+ * TODO: call exit in main (that requires writing an alternative runtime, why?).
  */
 
 #![allow(unknown_lints)]
