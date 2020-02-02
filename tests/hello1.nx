@@ -1,5 +1,5 @@
 fun main() = (
     print("Hello, World!\n");
     print("2\n");
-    printi(42)
+    printi(42);
 )

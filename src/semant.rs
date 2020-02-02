@@ -320,6 +320,13 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
                 return self.undefined_function(function, expr.pos);
             },
+            Expr::EmptyTuple => {
+                TypedExpr {
+                    expr: tast::Expr::EmptyTuple,
+                    pos: expr.pos,
+                    typ: Type::Unit,
+                }
+            },
             Expr::If { else_, condition, then } => {
                 let condition = Box::new(self.trans_exp(*condition));
                 self.check_bool(&condition, then.pos);

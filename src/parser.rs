@@ -106,15 +106,6 @@ macro_rules! eat {
     };
 }
 
-macro_rules! fields {
-    ($_self:ident, $pat:ident) => {
-        match $_self.peek()?.token {
-            $pat => vec![],
-            _ => $_self.fields()?,
-        }
-    };
-}
-
 #[derive(PartialEq)]
 enum Scope {
     Global,
@@ -287,11 +278,17 @@ impl<'a, R: Read> Parser<'a, R> {
         self.lvalue(var)
     }
 
-    fn fields(&mut self) -> Result<Vec<FieldWithPos>> {
+    fn fields(&mut self, end_token: Tok) -> Result<Vec<FieldWithPos>> {
+        if self.peek()?.token == end_token {
+            return Ok(vec![]);
+        }
         let field = self.field_dec()?;
         let mut fields = vec![field];
         while let Comma = self.peek()?.token {
             eat!(self, Comma);
+            if self.peek()?.token == end_token {
+                break;
+            }
             fields.push(self.field_dec()?)
         }
         Ok(fields)
@@ -331,7 +328,7 @@ impl<'a, R: Read> Parser<'a, R> {
         eat!(self, Ident, func_name);
         let name = self.symbols.symbol(&func_name);
         eat!(self, OpenParen);
-        let params = fields!(self, CloseParen);
+        let params = self.fields(CloseParen)?;
         eat!(self, CloseParen);
         let result = self.optional_type()?;
         Ok(WithPos::new(ExternFuncDeclaration {
@@ -347,7 +344,7 @@ impl<'a, R: Read> Parser<'a, R> {
         eat!(self, Ident, func_name);
         let name = self.symbols.symbol(&func_name);
         eat!(self, OpenParen);
-        let params = fields!(self, CloseParen);
+        let params = self.fields(CloseParen)?;
         eat!(self, CloseParen);
         let result = self.optional_type()?;
         eat!(self, Equal);
@@ -518,6 +515,9 @@ impl<'a, R: Read> Parser<'a, R> {
         let mut fields = vec![field];
         while let Comma = self.peek()?.token {
             eat!(self, Comma);
+            if self.peek()?.token == CloseCurly {
+                break;
+            }
             fields.push(self.field_create()?)
         }
         let end_pos = eat!(self, CloseCurly);
@@ -559,7 +559,7 @@ impl<'a, R: Read> Parser<'a, R> {
     fn struct_ty(&mut self, typ: Symbol, pos: Pos) -> Result<TyWithPos> {
         let typ = WithPos::new(typ, pos);
         eat!(self, OpenCurly);
-        let fields = fields!(self, CloseCurly);
+        let fields = self.fields(CloseCurly)?;
         eat!(self, CloseCurly);
         Ok(WithPos::new(Ty::Struct {
             fields,
@@ -595,7 +595,11 @@ impl<'a, R: Read> Parser<'a, R> {
         eat!(self, OpenParen);
         let mut exprs = vec![self.expr()?];
         while let Semicolon = self.peek()?.token {
-            eat!(self, Semicolon);
+            let pos = eat!(self, Semicolon);
+            if self.peek()?.token == CloseParen {
+                exprs.push(WithPos::new(Expr::EmptyTuple, pos));
+                break;
+            }
             exprs.push(self.expr()?);
         }
         eat!(self, CloseParen);
@@ -639,7 +643,7 @@ impl<'a, R: Read> Parser<'a, R> {
                     }, pos))
                 }
             },
-            _ => Err(self.unexpected_token("array or identifier")?),
+            _ => Err(self.unexpected_token("[ or identifier")?),
         }
     }
 

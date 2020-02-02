@@ -1,12 +1,12 @@
 type Point = Point {
     x: int,
-    y: int
+    y: int,
 }
 
 fun main() = (
     var point := Point {
         x = 42,
-        y = 24
+        y = 24,
     };
     printi(point.x);
     printi(point.y);

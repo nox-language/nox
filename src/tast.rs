@@ -61,6 +61,7 @@ pub enum Expr {
         llvm_function: Function,
     },
     Decl(Box<TypedDeclaration>),
+    EmptyTuple,
     If {
         condition: Box<TypedExpr>,
         else_: Option<Box<TypedExpr>>,

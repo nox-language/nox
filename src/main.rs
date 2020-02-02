@@ -28,7 +28,7 @@
  * TODO: use && instead of & for boolean comparison.
  * FIXME: global array does not compile.
  * TODO: change the struct definition syntax to `struct Name { … }`?
- * TODO: allow leading commas (for fields in struct, in arrays, parameters).
+ * TODO: allow leading commas and semicolon (in arrays).
  * TODO: functions call do not need parentheses?
  * TODO: error on missing a main function.
  * TODO: call exit in main (that requires writing an alternative runtime).

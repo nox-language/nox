@@ -253,6 +253,7 @@ impl Gen {
                     let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(arg)).collect();
                     self.builder.call(llvm_function.clone(), &arguments, "")
                 },
+                Expr::EmptyTuple => constant::int(types::int32(), 0, true),
                 Expr::If { condition, then, else_ } => {
                     let condition = self.expr(*condition);
                     let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "ifcond");

@@ -184,6 +184,7 @@ impl Error {
             UnexpectedToken { ref expected, pos, ref unexpected } => {
                 eprintln!("Unexpected token {}, expecting {}{}", unexpected, expected, END_BOLD);
                 pos.show(symbols);
+                highlight_line(pos, symbols)?;
             },
             UnexpectedType { ref kind, pos } => {
                 eprintln!("Expecting {} type{}", kind, END_BOLD);

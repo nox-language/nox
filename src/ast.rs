@@ -54,6 +54,7 @@ pub enum Expr {
         function: Symbol,
     },
     Decl(Box<DeclarationWithPos>),
+    EmptyTuple,
     If {
         condition: Box<ExprWithPos>,
         else_: Option<Box<ExprWithPos>>,

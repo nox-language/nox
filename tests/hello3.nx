@@ -52,6 +52,6 @@ in (
     printi(indexing);
     printi(myStruct.myNum);
     printi(fielding);
-    printi(both)
+    printi(both);
 )
 end
