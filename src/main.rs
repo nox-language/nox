@@ -20,6 +20,7 @@
  */
 
 /*
+ * TODO: show errors in reverse order.
  * TODO: use = instead of := for variable declaration.
  * TODO: better error messages for unclosed strings.
  * TODO: show the struct name instead of its structure in error messages.
