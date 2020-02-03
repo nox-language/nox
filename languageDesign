@@ -1,5 +1,7 @@
 = Refinement type for memory and thread safety
 
+== Goal/values
+
 == Thread Safety
 
 thread_spawn(value: T)
@@ -58,8 +60,13 @@ let malloc(): ptr
 === No access to uninitialized values
 
 Think about uninitialized values (from malloc).
-No implicit free to avoid freeing uninitialized memory.
+No implicit free to avoid freeing uninitialized memory. Why? You meant to avoid double-free?
 Functions to work with uninitialized memory.
+
+=== Pointer
+
+No ownership for pointers, but ownership for the other types, which would allow creating a struct Unique(pointer)
+to have unique pointers?
 
 === Inline assembly
 
@@ -127,3 +134,7 @@ Déréférencement de pointeur en suffixe genre ptr*.field avec probablement un 
 == Standard library
 
 writev for atomic printf?
+
+== No-go
+
+No implicit variant for enum.
