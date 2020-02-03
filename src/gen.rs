@@ -200,40 +200,13 @@ impl Gen {
                         let size_of = size_of(typ);
                         let align = align_of(&expr.typ);
                         let value = self.expr(*expr);
-                        let variable =
-                            match var.var {
-                                Var::Field { .. } => unreachable!(),
-                                Var::Global { .. } => unreachable!(),
-                                Var::Simple { value } => value,
-                                Var::Subscript { expr, this } => {
-                                    let index = self.expr(*expr);
-                                    let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
-                                    let this = self.variable_address(*this);
-                                    self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
-                                },
-                            };
+                        let variable = self.variable_address(var);
                         let size = constant::int(types::int32(), (size_of * size) as u64, true);
                         self.builder.mem_move(&variable, align, &value, align, &size)
                     }
                     else {
                         let value = self.expr(*expr);
-                        let variable =
-                            match var.var {
-                                Var::Field { index, this } => {
-                                    let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
-                                    let this = self.variable_address(*this);
-                                    self.builder.struct_gep(&llvm_type, &this, index, "field")
-                                },
-                                Var::Global { .. } => unreachable!(),
-                                Var::Simple { value } => value,
-                                Var::Subscript { expr, this } => {
-                                    // TODO: remove this code duplicate?
-                                    let index = self.expr(*expr);
-                                    let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
-                                    let this = self.variable_address(*this);
-                                    self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
-                                },
-                            };
+                        let variable = self.variable_address(var);
                         self.builder.store(&value, &variable)
                     }
                 },
@@ -453,11 +426,15 @@ impl Gen {
 
     fn variable_address(&mut self, variable: TypedVar) -> Value {
         match variable.var {
-            Var::Field { .. } => unimplemented!(),
+            Var::Field { index, this } => {
+                let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
+                let this = self.variable_address(*this);
+                self.builder.struct_gep(&llvm_type, &this, index, "field")
+            },
             Var::Global { .. } => unimplemented!(),
             Var::Simple { value } => value,
             Var::Subscript { this, expr } => {
-                let llvm_type = to_llvm_type(&variable.typ).expect("llvm type");
+                let llvm_type = to_llvm_type(&this.typ).expect("llvm type");
                 let this = self.variable_address(*this);
                 let index = self.expr(*expr);
                 self.builder.gep(&llvm_type, &this, &[constant::int(types::int32(), 0, true), index], "index")
@@ -468,15 +445,16 @@ impl Gen {
 
 fn align_of(typ: &Type) -> usize {
     match *typ {
-        Type::Array(ref typ, _) => size_of(typ),
+        Type::Array(ref typ, _) => align_of(typ),
         Type::Int32 => size_of(typ),
-        Type::Struct(_, _, _) => size_of(&Type::Int32), // TODO: compute real struct alignment.
+        Type::Struct(_, _, _) => align_of(&Type::Int32), // TODO: compute real struct alignment.
         _ => unimplemented!("align_of {:?}", typ),
     }
 }
 
 fn size_of(typ: &Type) -> usize {
     match *typ {
+        Type::Array(ref typ, size) => size_of(typ) * size,
         Type::Int32 => 4,
         Type::Struct(_, ref fields, _) =>
             fields.iter().map(|(_, typ)| size_of(typ))
