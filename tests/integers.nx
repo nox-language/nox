@@ -8,4 +8,6 @@ fun main() = (
     printi(addition);
     printi(result);
     printi(200 - n * minus_n);
+    printi(2 & 3);
+    printi(2 | 3);
 )

@@ -320,8 +320,8 @@ impl Gen {
                     let left = self.expr(*left);
                     let right = self.expr(*right);
                     match oper.node {
-                        Operator::And => unimplemented!(),
-                        Operator::Divide => unimplemented!(),
+                        Operator::And => self.builder.and(&left, &right, "and"),
+                        Operator::Divide => self.builder.div(&left, &right, "quotient"),
                         Operator::Equal => self.builder.icmp(IntPredicate::Equal, &left, &right, "cmptmp"),
                         Operator::Ge => self.builder.icmp(IntPredicate::SignedGreaterThanOrEqual, &left, &right, "cmptmp"),
                         Operator::Gt => self.builder.icmp(IntPredicate::SignedGreaterThan, &left, &right, "cmptmp"),
@@ -329,9 +329,9 @@ impl Gen {
                         Operator::Lt => self.builder.icmp(IntPredicate::SignedLesserThan, &left, &right, "cmptmp"),
                         Operator::Minus => self.builder.sub(&left, &right, "diff"),
                         Operator::Neq => self.builder.icmp(IntPredicate::NotEqual, &left, &right, "cmptmp"),
-                        Operator::Or => unimplemented!(),
+                        Operator::Or => self.builder.or(&left, &right, "or"),
                         Operator::Plus => self.builder.add(&left, &right, "sum"),
-                        Operator::Times => unimplemented!(),
+                        Operator::Times => self.builder.mul(&left, &right, "product"),
                     }
                 },
                 Expr::Sequence(mut exprs) => {

@@ -39,7 +39,7 @@ fn test_execution() {
         "hello2",
         //"hello3",
         //"hello5",
-        //"integers",
+        "integers",
         "lib",
         "loops",
         //"merge",
