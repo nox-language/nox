@@ -38,7 +38,7 @@ fn test_execution() {
         "hello1",
         "hello2",
         //"hello3",
-        //"hello5",
+        "hello5",
         "integers",
         "lib",
         "loops",

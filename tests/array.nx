@@ -1,5 +1,10 @@
 fun main() = (
-    var len := 12;
+    for i := 0 to 10 do
+        printi(i);
+    /*for i := 0 to 10 do
+        for j := 0 to 7 do
+            printi(i * j);*/
+    /*var len := 12;
     var a := [0; 12];
     var b := [7; 12];
     var value := a[0];
@@ -11,5 +16,5 @@ fun main() = (
     for i := 0 to len - 1 do
         a[i] := i;
     for i := 0 to len - 1 do
-        printi(a[i])
+        printi(a[i])*/
 )
