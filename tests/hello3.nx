@@ -46,8 +46,8 @@ fun main() = (
         },
     };
     var fielding := myStruct2.myString.len;
-    /*var myArrayOfStruct := [myType { myString = [10; 10] }; 10] ;
-    var both := myArrayOfStruct[0].myString[1];*/
+    var myArrayOfStruct := [myType { myString = [10; 10] }; 10];
+    var both := myArrayOfStruct[0].myString[1];
 
     hello();
     myFunc(45);
@@ -58,5 +58,5 @@ fun main() = (
     printi(indexing);
     printi(myStruct.myNum);
     printi(fielding);
-    /*printi(both);*/
+    printi(both);
 )

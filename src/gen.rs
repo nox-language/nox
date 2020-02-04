@@ -198,15 +198,7 @@ impl Gen {
                 },
                 Expr::Assign { expr, var } => {
                     match expr.typ {
-                        Type::Array(ref typ, size) => {
-                            let size_of = size_of(typ);
-                            let align = align_of(&expr.typ);
-                            let value = self.expr(*expr);
-                            let variable = self.variable_address(var);
-                            let size = constant::int(types::int32(), (size_of * size) as u64, true);
-                            self.builder.mem_move(&variable, align, &value, align, &size)
-                        },
-                        Type::Struct(_, _, _) => {
+                        Type::Array(_, _) | Type::Struct(_, _, _) => {
                             let size_of = size_of(&expr.typ);
                             let align = align_of(&expr.typ);
                             let value = self.expr(*expr);
