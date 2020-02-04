@@ -1,4 +1,4 @@
-/*fun hello() = print("Hello, World!\n")*/
+fun hello() = print("Hello, World!\n")
 
 type myType = myType {
     myString: [int; 10],
@@ -19,26 +19,26 @@ type myStruct2 = myStruct2 {
     myString: myString
 }
 
-/*fun myFunc(myParam: int) = (
+fun myFunc(myParam: int) = (
     print("Hello ");
     printi(myParam)
 )
 
 fun id(myParam: int): int = myParam
 
-fun const(param: int, other: int): int = param*/
+fun const(param: int, other: int): int = param
 
 fun main() = (
-    /*var num := 42;
+    var num := 42;
     var num: int := 42;
     var myNull: myStruct := nil;
-    var myArray := [44; 10];*/
+    var myArray := [44; 10];
     var myArrayOfArray := [[43; 10]; 10];
-    /*var indexing := myArray[0];
+    var indexing := myArray[0];
     var myNum := 9;
     var indexing := myArrayOfArray[myNum][0];
     var myStruct := myStruct { myNum = 42 };
-    var fielding := myStruct.myNum;*/
+    var fielding := myStruct.myNum;
     /*var myStruct2 := myStruct2 {
         myNum2 = 10,
         myString = myString {
@@ -49,14 +49,14 @@ fun main() = (
     /*var myArrayOfStruct := [myType { myString = [10; 10] }; 10] ;
     var both := myArrayOfStruct[0].myString[1];*/
 
-    /*hello();
+    hello();
     myFunc(45);
     printi(id(18));
     printi(const(2, 4));
     printi(myArray[4]);
     printi(myArray[0]);
     printi(indexing);
-    printi(myStruct.myNum);*/
+    printi(myStruct.myNum);
     /*printi(fielding);*/
     /*printi(both);*/
 )

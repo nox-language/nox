@@ -336,12 +336,12 @@ impl Gen {
 
                     let loop_basic_block = BasicBlock::append(&function, "loop");
                     let after_basic_block = BasicBlock::append(&function, "afterloop");
+                    let previous_break_label = self.break_label.clone();
                     self.break_label = Some(after_basic_block.clone());
                     self.builder.cond_br(&condition, &loop_basic_block, &after_basic_block);
 
                     self.builder.position_at_end(&loop_basic_block);
 
-                    let previous_break_label = self.break_label.clone();
                     self.expr(*body);
                     self.break_label = previous_break_label;
                     self.builder.br(&start_loop_basic_block);
