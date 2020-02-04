@@ -174,6 +174,7 @@ impl Gen {
                         self.builder.mem_move(&value, align, &init_value, align, &size);
                     },
                     Type::Struct(_, _, _) => {
+                        // TODO: remove duplication with the Array case?
                         let size = constant::int(types::int32(), size_of(&init.typ) as u64, true);
                         let align = align_of(&init.typ);
                         let init_value = self.expr(init);
@@ -196,18 +197,28 @@ impl Gen {
                     self.builder.alloca(typ, "array")
                 },
                 Expr::Assign { expr, var } => {
-                    if let Type::Array(ref typ, size) = expr.typ {
-                        let size_of = size_of(typ);
-                        let align = align_of(&expr.typ);
-                        let value = self.expr(*expr);
-                        let variable = self.variable_address(var);
-                        let size = constant::int(types::int32(), (size_of * size) as u64, true);
-                        self.builder.mem_move(&variable, align, &value, align, &size)
-                    }
-                    else {
-                        let value = self.expr(*expr);
-                        let variable = self.variable_address(var);
-                        self.builder.store(&value, &variable)
+                    match expr.typ {
+                        Type::Array(ref typ, size) => {
+                            let size_of = size_of(typ);
+                            let align = align_of(&expr.typ);
+                            let value = self.expr(*expr);
+                            let variable = self.variable_address(var);
+                            let size = constant::int(types::int32(), (size_of * size) as u64, true);
+                            self.builder.mem_move(&variable, align, &value, align, &size)
+                        },
+                        Type::Struct(_, _, _) => {
+                            let size_of = size_of(&expr.typ);
+                            let align = align_of(&expr.typ);
+                            let value = self.expr(*expr);
+                            let variable = self.variable_address(var);
+                            let size = constant::int(types::int32(), size_of as u64, true);
+                            self.builder.mem_move(&variable, align, &value, align, &size)
+                        },
+                        _ => {
+                            let value = self.expr(*expr);
+                            let variable = self.variable_address(var);
+                            self.builder.store(&value, &variable)
+                        },
                     }
                 },
                 Expr::Bool(value) => {

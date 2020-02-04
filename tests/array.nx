@@ -1,5 +1,5 @@
 fun main() = (
-    /*var len := 12;
+    var len := 12;
     var a := [0; 12];
     var b := [7; 12];
     var value := a[0];
@@ -11,5 +11,5 @@ fun main() = (
     for i := 0 to len - 1 do
         a[i] := i;
     for i := 0 to len - 1 do
-        printi(a[i])*/
+        printi(a[i])
 )
