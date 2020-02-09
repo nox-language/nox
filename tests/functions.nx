@@ -14,12 +14,12 @@ fun sum10(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, i: int
     a + b + c + d + e + f + g + h + i + j
 
 fun main() = (
-    printi(minimum(42, 24));
-    printi(maximum(
-        42,
-        24,
-    ));
-    printi(minimum(24, 42));
-    printi(maximum(24, 42));
-    printi(sum10(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+    printi (minimum 42 24);
+    printi (maximum
+        42
+        24
+    );
+    printi (minimum 24 42);
+    printi (maximum 24 42);
+    printi (sum10 1 2 3 4 5 6 7 8 9 10)
 )

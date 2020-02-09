@@ -3,11 +3,11 @@ fun main() = (
     var minus_n = -n;
     var addition = n + 2 + minus_n;
     var result = minus_n / addition;
-    printi(10 / 2);
-    printi(minus_n);
-    printi(addition);
-    printi(result);
-    printi(200 - n * minus_n);
-    printi(2 & 3);
-    printi(2 | 3);
+    printi (10 / 2);
+    printi minus_n;
+    printi addition;
+    printi result;
+    printi (200 - n * minus_n);
+    printi (2 & 3);
+    printi (2 | 3);
 )

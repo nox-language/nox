@@ -1,2 +1,2 @@
 fun main() =
-    print(concat("Hello, ", "World!\n"))
+    print(concat "Hello, " "World!\n")

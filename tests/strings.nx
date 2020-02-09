@@ -1,12 +1,12 @@
 fun main() = (
-    printi(ord("a"));
-    print(chr(97));
-    print("\n");
-    print(chr(ord("a")));
-    print("\n");
+    printi (ord "a");
+    print (chr 97);
+    print "\n";
+    print (chr (ord "a"));
+    print "\n";
     /*if "a" = "a" then // TODO: uncomment
-        print("true\n");*/
-    var char = getchar();
-    print(char);
-    print("\n")
+        print "true\n";*/
+    var char = getchar;
+    print char;
+    print "\n";
 )

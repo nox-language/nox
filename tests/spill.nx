@@ -9,14 +9,14 @@ fun main() = (
     var h = 8;
     var i = 9;
     var j = 10;
-    printi(a);
-    printi(b);
-    printi(c);
-    printi(d);
-    printi(e);
-    printi(f);
-    printi(g);
-    printi(h);
-    printi(i);
-    printi(j);
+    printi a;
+    printi b;
+    printi c;
+    printi d;
+    printi e;
+    printi f;
+    printi g;
+    printi h;
+    printi i;
+    printi j;
 )

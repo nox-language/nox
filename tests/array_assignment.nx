@@ -2,8 +2,8 @@ fun main() = (
     var a = [0; 12];
     var b = [7; 12];
     a = b;
-    a[0] = 10;
-    printi(b[0]); /* FIXME: that should not compile: use of moved value. */
-    b[0] = 12;
-    printi(a[0])
+    a.[0] = 10;
+    printi b.[0]; /* FIXME: that should not compile: use of moved value. */
+    b.[0] = 12;
+    printi a.[0];
 )

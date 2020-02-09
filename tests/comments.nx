@@ -6,4 +6,4 @@ fun main() =
      /* var C = 12
       */
      */
-    print("N\n")
+    print "N\n"

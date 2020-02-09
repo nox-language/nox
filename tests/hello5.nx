@@ -2,8 +2,8 @@ fun hello() = print("Hello, World!\n")
 type intArray = [int; 10]
 
 fun main() = (
-    hello();
-    print("Test\n");
+    hello;
+    print "Test\n";
     5 + 2;
     10 * 11 + 2 / 1 * -42;
     10 * (11 + 2) / 1 * -42;

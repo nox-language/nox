@@ -1,14 +1,14 @@
 fun main() = (
     var i = 0;
     while i < 10 do (
-        printi(i);
+        printi i;
         break;
         i = i + 1
     );
 
     var i = 0;
     while i < 10 do (
-        printi(i);
+        printi i;
         if i == 5 then
             break;
         i = i + 1
@@ -18,7 +18,7 @@ fun main() = (
     var iter_end = 10;
     if i < iter_end then
         while true do (
-            printi(i);
+            printi i;
             if i < iter_end then
                 i = i + 1
             else
@@ -26,5 +26,5 @@ fun main() = (
         );
 
     for i = 0 to 10 do
-        printi(i)
+        printi i
 )

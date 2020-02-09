@@ -265,35 +265,29 @@ impl<'a, R: Read> Parser<'a, R> {
         let name;
         let pos = eat!(self, Ident, name);
         let symbol = self.symbols.symbol(&name);
-        if let OpenParen = self.peek()?.token {
-            eat!(self, OpenParen);
-            let mut args = vec![];
-            loop {
-                if let CloseParen = self.peek()?.token {
-                    break;
+        match self.peek()?.token {
+            OpenCurly => self.struct_create(WithPos::new(symbol, pos), pos),
+            ref token if is_expr(token) => {
+                let mut args = vec![];
+                loop {
+                    if !is_expr(&self.peek()?.token) {
+                        break;
+                    }
+                    let arg = self.expr()?;
+                    args.push(arg);
                 }
-                let arg = self.expr()?;
-                args.push(arg);
-                match self.peek()?.token {
-                    Comma => { self.token()?; },
-                    _ => break,
-                }
-            }
-            let end_pos = eat!(self, CloseParen);
-            Ok(WithPos::new(Expr::Call {
-                args,
-                function: symbol,
-            }, pos.grow(end_pos)))
-        }
-        else {
-            match self.peek()?.token {
-                OpenCurly => self.struct_create(WithPos::new(symbol, pos), pos),
-                _ => {
-                    let var = WithPos::new(Var::Simple {
-                        ident: WithPos::new(symbol, pos),
-                    }, pos);
-                    self.lvalue_or_assign(var)
-                }
+                // NOTE: unwrap is fine since there's at least one expression parsed.
+                let end_pos = args.last().map(|expr| expr.pos).unwrap();
+                Ok(WithPos::new(Expr::Call {
+                    args,
+                    function: symbol,
+                }, pos.grow(end_pos)))
+            },
+            _ => {
+                let var = WithPos::new(Var::Simple {
+                    ident: WithPos::new(symbol, pos),
+                }, pos);
+                self.lvalue_or_assign(var)
             }
         }
     }
@@ -315,8 +309,11 @@ impl<'a, R: Read> Parser<'a, R> {
         }, pos))
     }
 
-    fn field_exp(&mut self, var: VarWithPos) -> Result<VarWithPos> {
+    fn field_or_subscript_exp(&mut self, var: VarWithPos) -> Result<VarWithPos> {
         eat!(self, Dot);
+        if let OpenSquare = self.peek()?.token {
+            return self.subscript(var);
+        }
         let field_name;
         let pos = eat!(self, Ident, field_name);
         let var_pos = var.pos.grow(pos);
@@ -378,7 +375,7 @@ impl<'a, R: Read> Parser<'a, R> {
         let name = self.symbols.symbol(&func_name);
         eat!(self, OpenParen);
         let params = self.fields(CloseParen)?;
-        eat!(self, CloseParen);
+        eat!(self, CloseParen, ")");
         let result = self.optional_type()?;
         Ok(WithPos::new(ExternFuncDeclaration {
             name,
@@ -394,7 +391,7 @@ impl<'a, R: Read> Parser<'a, R> {
         let name = self.symbols.symbol(&func_name);
         eat!(self, OpenParen);
         let params = self.fields(CloseParen)?;
-        eat!(self, CloseParen);
+        eat!(self, CloseParen, ")");
         let result = self.optional_type()?;
         eat!(self, Equal);
         let body = self.expr()?;
@@ -481,8 +478,7 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn lvalue(&mut self, var: VarWithPos) -> Result<VarWithPos> {
         match self.peek()?.token {
-            OpenSquare => self.subscript(var),
-            Dot => self.field_exp(var),
+            Dot => self.field_or_subscript_exp(var),
             _ => Ok(var),
         }
     }
@@ -651,7 +647,7 @@ impl<'a, R: Read> Parser<'a, R> {
             }
             exprs.push(self.expr()?);
         }
-        eat!(self, CloseParen);
+        eat!(self, CloseParen, ")");
         let pos = exprs.last().unwrap().pos;
         Ok(WithPos::new(Expr::Sequence(exprs), pos))
     }
@@ -776,8 +772,9 @@ impl<'a, R: Read> Parser<'a, R> {
         let mut declarations = vec![];
         loop {
             match self.peek_token() {
-                Err(Error::Eof) => break,
+                Err(Error::Eof) => break, // TODO: is that still needed?
                 Err(error) => return Err(error.clone()),
+                Ok(EndOfFile) => break,
                 Ok(token) => {
                     match token {
                         Extern => {
@@ -896,4 +893,11 @@ fn for_loop(symbols: &mut Symbols<()>, var: Symbol, body: ExprWithPos, var_pos: 
     ]);
 
     WithPos::new(declarations, pos)
+}
+
+fn is_expr(token: &Tok) -> bool {
+    match *token {
+        False | Ident(_) | If | Int(_) | OpenParen | OpenSquare | Str(_) | True => true,
+        _ => false,
+    }
 }

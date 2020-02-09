@@ -1,5 +1,5 @@
 fun main() = (
     var N = 8;
-    print("\n\t\\\"\065\
-    	\test\n")
+    print "\n\t\\\"\065\
+    	\test\n";
 )

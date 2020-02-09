@@ -1,2 +1,2 @@
 /* Hello-world */
-fun main() = print("Hello, World!\n")
+fun main() = print "Hello, World!\n"

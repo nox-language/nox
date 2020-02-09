@@ -1,4 +1,4 @@
-fun hello() = print("Hello, World!\n")
+fun hello() = print "Hello, World!\n"
 
 type myType = myType {
     myString: [int; 10],
@@ -20,8 +20,8 @@ type myStruct2 = myStruct2 {
 }
 
 fun myFunc(myParam: int) = (
-    print("Hello ");
-    printi(myParam)
+    print "Hello ";
+    printi myParam;
 )
 
 fun id(myParam: int): int = myParam
@@ -34,9 +34,9 @@ fun main() = (
     var myNull: myStruct = nil;
     var myArray = [44; 10];
     var myArrayOfArray = [[43; 10]; 10];
-    var indexing = myArray[0];
+    var indexing = myArray.[0];
     var myNum = 9;
-    var indexing = myArrayOfArray[myNum][0];
+    var indexing = myArrayOfArray.[myNum].[0];
     var myStruct = myStruct { myNum = 42 };
     var fielding = myStruct.myNum;
     var myStruct2 = myStruct2 {
@@ -47,16 +47,16 @@ fun main() = (
     };
     var fielding = myStruct2.myString.len;
     var myArrayOfStruct = [myType { myString = [10; 10] }; 10];
-    var both = myArrayOfStruct[0].myString[1];
+    var both = myArrayOfStruct.[0].myString.[1];
 
-    hello();
-    myFunc(45);
-    printi(id(18));
-    printi(const(2, 4));
-    printi(myArray[4]);
-    printi(myArray[0]);
-    printi(indexing);
-    printi(myStruct.myNum);
-    printi(fielding);
-    printi(both);
+    hello;
+    myFunc 45;
+    printi (id 18);
+    printi (const 2 4);
+    printi myArray.[4];
+    printi myArray.[0];
+    printi indexing;
+    printi myStruct.myNum;
+    printi fielding;
+    printi both;
 )

@@ -2,27 +2,27 @@ fun main() = (
     var len = 12;
     var a = [0; 12];
     var b = [7; 12];
-    var value = a[0];
-    printi(value);
-    var value = b[0];
-    printi(value);
-    a[0] = 10;
-    printi(a[0]);
+    var value = a.[0];
+    printi value;
+    var value = b.[0];
+    printi value;
+    a.[0] = 10;
+    printi a.[0];
     for i = 0 to len - 1 do
-        a[i] = i;
+        a.[i] = i;
     for i = 0 to len - 1 do
-        printi(a[i]);
+        printi a.[i];
     var c = [
         40,
         41,
         42,
     ];
-    printi(c[0]);
-    printi(c[1]);
-    printi(c[2]);
+    printi c.[0];
+    printi c.[1];
+    printi c.[2];
     var d = [12];
-    printi(d[0]);
+    printi d.[0];
     var e = [1, 2];
-    printi(e[0]);
-    printi(e[1]);
+    printi e.[0];
+    printi e.[1];
 )

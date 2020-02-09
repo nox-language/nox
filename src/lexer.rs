@@ -361,7 +361,14 @@ impl<R: Read> Lexer<R> {
         match self.bytes_iter.next() {
             Some(Ok(_)) => unreachable!(),
             Some(Err(error)) => Err(error.into()),
-            None => Err(Eof),
+            None => {
+                let mut pos = self.pos;
+                pos.length = 1;
+                Ok(Token {
+                    pos,
+                    token: EndOfFile,
+                })
+            },
         }
     }
 

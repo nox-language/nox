@@ -3,7 +3,7 @@ var i: int = 0
 fun main() = (
     var j = 1;
     var k = 2;
-    printi(i);
-    printi(j);
-    printi(k)
+    printi i;
+    printi j;
+    printi k;
 )
