@@ -12,3 +12,4 @@ pred2 || pred1
 pred1
 pred2
 pred1 || pred2
+num != 12

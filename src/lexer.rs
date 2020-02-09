@@ -124,6 +124,10 @@ impl<R: Read> Lexer<R> {
         self.advance()
     }
 
+    fn not_or_not_equal(&mut self) -> Result<Token> {
+        self.two_char_token(vec![('=', NotEqual)], Not)
+    }
+
     fn escape_ascii_code(&mut self, pos: Pos) -> Result<char> {
         let buffer = self.take_while(char::is_numeric)?;
         if buffer.len() == 3 {
@@ -200,8 +204,8 @@ impl<R: Read> Lexer<R> {
         self.make_token(Int(num), num_text_size(num))
     }
 
-    fn lesser_or_lesser_equal_or_not_equal(&mut self) -> Result<Token> {
-        self.two_char_token(vec![('=', LesserOrEqual), ('>', NotEqual)], Lesser)
+    fn lesser_or_lesser_equal(&mut self) -> Result<Token> {
+        self.two_char_token(vec![('=', LesserOrEqual)], Lesser)
     }
 
     fn one_or_two_ampersand(&mut self) -> Result<Token> {
@@ -342,6 +346,7 @@ impl<R: Read> Lexer<R> {
                     self.token()
                 }
                 b'=' => self.one_or_two_equal(),
+                b'!' => self.not_or_not_equal(),
                 b'&' => self.one_or_two_ampersand(),
                 b'|' => self.one_or_two_pipe(),
                 b'.' => self.simple_token(Dot),
@@ -358,7 +363,7 @@ impl<R: Read> Lexer<R> {
                 b']' => self.simple_token(CloseSquare),
                 b':' => self.simple_token(Colon),
                 b'>' => self.greater_or_greater_equal(),
-                b'<' => self.lesser_or_lesser_equal_or_not_equal(),
+                b'<' => self.lesser_or_lesser_equal(),
                 b'/' => self.slash_or_comment(),
                 b'"' => self.string(),
                 _ => Err(UnknownToken {

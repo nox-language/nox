@@ -47,4 +47,10 @@ fun main() = (
 
     if pred1 num || pred2 num then
         print "pred1 || pred2\n";
+
+    if num != 42 then
+        print "num != 42\n";
+
+    if num != 12 then
+        print "num != 12\n";
 )
