@@ -23,12 +23,15 @@
 
 /*
  * Operator precedence:
+ * function application
  * -
  * * /
  * + -
- * = <> > < >= <=
  * &
  * |
+ * == <> > < >= <=
+ * &&
+ * ||
  */
 
 use std::io::Read;
@@ -148,6 +151,28 @@ impl<'a, R: Read> Parser<'a, R> {
             }, pos);
         }
         Ok(expr)
+    }
+
+    fn arg(&mut self) -> Result<ExprWithPos> {
+        match self.peek()?.token {
+            False => self.boolean(false),
+            Ident(_) => {
+                let name;
+                let pos = eat!(self, Ident, name);
+                let symbol = self.symbols.symbol(&name);
+                let var = WithPos::new(Var::Simple {
+                    ident: WithPos::new(symbol, pos),
+                }, pos);
+                Ok(WithPos::new(Expr::Variable(self.lvalue(var)?), pos))
+            },
+            Int(_) => self.int_lit(),
+            Nil => self.nil(),
+            OpenParen => self.seq_exp(),
+            OpenSquare => self.array(),
+            Str(_) => self.string_lit(),
+            True => self.boolean(true),
+            _ => Err(self.unexpected_token("break, false, for, fun, if, identifier, integer literal, nil, (, string literal, true, var, while")?),
+        }
     }
 
     fn array(&mut self) -> Result<ExprWithPos> {
@@ -271,10 +296,10 @@ impl<'a, R: Read> Parser<'a, R> {
             ref token if is_expr(token) => {
                 let mut args = vec![];
                 loop {
-                    if !is_expr(&self.peek()?.token) {
+                    if !is_arg(&self.peek()?.token) {
                         break;
                     }
-                    let arg = self.expr()?;
+                    let arg = self.arg()?;
                     args.push(arg);
                 }
                 // NOTE: unwrap is fine since there's at least one expression parsed.
@@ -447,11 +472,11 @@ impl<'a, R: Read> Parser<'a, R> {
         Ok(WithPos::new(Expr::Decl(Box::new(declaration)), pos))
     }
 
-    fn logical_and_expr(&mut self) -> Result<ExprWithPos> {
-        let mut expr = self.relational_expr()?;
+    fn arithmetic_and_expr(&mut self) -> Result<ExprWithPos> {
+        let mut expr = self.additive_expr()?;
         while let Ok(&Ampersand) = self.peek_token() {
             let oper_pos = eat!(self, Ampersand);
-            let right = Box::new(self.relational_expr()?);
+            let right = Box::new(self.additive_expr()?);
             let pos = expr.pos.grow(right.pos);
             expr = WithPos::new(Expr::Oper {
                 left: Box::new(expr),
@@ -462,16 +487,48 @@ impl<'a, R: Read> Parser<'a, R> {
         Ok(expr)
     }
 
-    fn logical_or_expr(&mut self) -> Result<ExprWithPos> {
-        let mut expr = self.logical_and_expr()?;
+    fn arithmetic_or_expr(&mut self) -> Result<ExprWithPos> {
+        let mut expr = self.arithmetic_and_expr()?;
         while let Ok(&Pipe) = self.peek_token() {
             let oper_pos = eat!(self, Pipe);
-            let right = Box::new(self.logical_and_expr()?);
+            let right = Box::new(self.arithmetic_and_expr()?);
             let pos = expr.pos.grow(right.pos);
             expr = WithPos::new(Expr::Oper {
                 left: Box::new(expr),
                 oper: WithPos::new(Operator::Or, oper_pos),
                 right,
+            }, pos);
+        }
+        Ok(expr)
+    }
+
+    fn logical_and_expr(&mut self) -> Result<ExprWithPos> {
+        let mut expr = self.relational_expr()?;
+        while let Ok(&AmpAmp) = self.peek_token() {
+            eat!(self, AmpAmp);
+            let right = Box::new(self.relational_expr()?);
+            let pos = expr.pos.grow(right.pos);
+
+            expr = WithPos::new(Expr::If {
+                else_: Some(Box::new(WithPos::new(Expr::Bool(false), pos))),
+                condition: Box::new(expr),
+                then: right,
+            }, pos);
+        }
+        Ok(expr)
+    }
+
+    fn logical_or_expr(&mut self) -> Result<ExprWithPos> {
+        let mut expr = self.logical_and_expr()?;
+        while let Ok(&PipePipe) = self.peek_token() {
+            eat!(self, PipePipe);
+            let right = Box::new(self.logical_and_expr()?);
+            let pos = expr.pos.grow(right.pos);
+
+            expr = WithPos::new(Expr::If {
+                else_: Some(right),
+                condition: Box::new(expr),
+                then: Box::new(WithPos::new(Expr::Bool(true), pos)),
             }, pos);
         }
         Ok(expr)
@@ -621,7 +678,7 @@ impl<'a, R: Read> Parser<'a, R> {
     }
 
     fn relational_expr(&mut self) -> Result<ExprWithPos> {
-        let mut expr = self.additive_expr()?;
+        let mut expr = self.arithmetic_or_expr()?;
         loop {
             let oper =
                 match self.peek_token() {
@@ -633,7 +690,7 @@ impl<'a, R: Read> Parser<'a, R> {
                     Ok(&NotEqual) => WithPos::new(Operator::Neq, eat!(self, NotEqual)),
                     _ => break,
                 };
-            let right = Box::new(self.additive_expr()?);
+            let right = Box::new(self.arithmetic_or_expr()?);
             let pos = expr.pos.grow(right.pos);
             expr = WithPos::new(Expr::Oper {
                 left: Box::new(expr),
@@ -897,6 +954,13 @@ fn for_loop(symbols: &mut Symbols<()>, var: Symbol, body: ExprWithPos, var_pos: 
     ]);
 
     WithPos::new(declarations, pos)
+}
+
+fn is_arg(token: &Tok) -> bool {
+    match *token {
+        False | Ident(_) | Int(_) | OpenParen | OpenSquare | Str(_) | True => true,
+        _ => false,
+    }
 }
 
 fn is_expr(token: &Tok) -> bool {

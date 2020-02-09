@@ -190,171 +190,169 @@ impl Gen {
     }
 
     fn expr(&mut self, expr: TypedExpr) -> Value {
-        let value =
-            match expr.expr {
-                Expr::Array { init, size } => {
-                    let typ = types::array::array(to_llvm_type(&init.typ).expect("llvm type"), size);
-                    self.builder.alloca(typ, "array")
-                },
-                Expr::Assign { expr, var } => {
-                    match expr.typ {
-                        Type::Array(_, _) | Type::Struct(_, _, _) => {
-                            let size_of = size_of(&expr.typ);
-                            let align = align_of(&expr.typ);
-                            let value = self.expr(*expr);
-                            let variable = self.variable_address(var);
-                            let size = constant::int(types::int32(), size_of as u64, true);
-                            self.builder.mem_move(&variable, align, &value, align, &size)
-                        },
-                        _ => {
-                            let value = self.expr(*expr);
-                            let variable = self.variable_address(var);
-                            self.builder.store(&value, &variable)
-                        },
+        match expr.expr {
+            Expr::Array { init, size } => {
+                let typ = types::array::array(to_llvm_type(&init.typ).expect("llvm type"), size);
+                self.builder.alloca(typ, "array")
+            },
+            Expr::Assign { expr, var } => {
+                match expr.typ {
+                    Type::Array(_, _) | Type::Struct(_, _, _) => {
+                        let size_of = size_of(&expr.typ);
+                        let align = align_of(&expr.typ);
+                        let value = self.expr(*expr);
+                        let variable = self.variable_address(var);
+                        let size = constant::int(types::int32(), size_of as u64, true);
+                        self.builder.mem_move(&variable, align, &value, align, &size)
+                    },
+                    _ => {
+                        let value = self.expr(*expr);
+                        let variable = self.variable_address(var);
+                        self.builder.store(&value, &variable)
+                    },
+                }
+            },
+            Expr::Bool(value) => {
+                constant::int(types::int1(), value as u64, true)
+            },
+            Expr::Break => {
+                let label = self.break_label.clone().expect("break label");
+                let val = self.builder.br(&label);
+                let start_basic_block = self.builder.get_insert_block().expect("start basic block");
+                let function = start_basic_block.get_parent();
+                let basic_block = BasicBlock::append(&function, "afterbreak");
+                self.builder.position_at_end(&basic_block);
+                val
+            },
+            Expr::Call { args, llvm_function } => {
+                let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(arg)).collect();
+                self.builder.call(llvm_function.clone(), &arguments, "")
+            },
+            Expr::EmptyTuple => constant::int(types::int32(), 0, true),
+            Expr::If { condition, then, else_ } => {
+                let condition = self.expr(*condition);
+                let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "ifcond");
+
+                let start_basic_block = self.builder.get_insert_block().expect("start basic block");
+
+                let function = start_basic_block.get_parent();
+
+                let then_basic_block = BasicBlock::append(&function, "then");
+
+                self.builder.position_at_end(&then_basic_block);
+
+                let then_is_unit = then.typ == Type::Unit;
+                let llvm_type = to_llvm_type(&then.typ).expect("llvm type");
+                let then_value = self.expr(*then);
+
+                let new_then_basic_block = self.builder.get_insert_block().expect("new then basic block");
+
+                let else_basic_block = BasicBlock::append(&function, "else");
+                self.builder.position_at_end(&else_basic_block);
+
+                let else_value = else_.map(|else_| self.expr(*else_));
+
+                let new_else_basic_block = self.builder.get_insert_block().expect("new else basic block");
+
+                let merge_basic_block = BasicBlock::append(&function, "ifcont");
+                self.builder.position_at_end(&merge_basic_block);
+
+                let result =
+                    if then_is_unit {
+                        then_value
                     }
-                },
-                Expr::Bool(value) => {
-                    constant::int(types::int1(), value as u64, true)
-                },
-                Expr::Break => {
-                    let label = self.break_label.clone().expect("break label");
-                    let val = self.builder.br(&label);
-                    let start_basic_block = self.builder.get_insert_block().expect("start basic block");
-                    let function = start_basic_block.get_parent();
-                    let basic_block = BasicBlock::append(&function, "afterbreak");
-                    self.builder.position_at_end(&basic_block);
-                    val
-                },
-                Expr::Call { args, llvm_function } => {
-                    let arguments: Vec<_> = args.into_iter().map(|arg| self.expr(arg)).collect();
-                    self.builder.call(llvm_function.clone(), &arguments, "")
-                },
-                Expr::EmptyTuple => constant::int(types::int32(), 0, true),
-                Expr::If { condition, then, else_ } => {
-                    let condition = self.expr(*condition);
-                    let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "ifcond");
-
-                    let start_basic_block = self.builder.get_insert_block().expect("start basic block");
-
-                    let function = start_basic_block.get_parent();
-
-                    let then_basic_block = BasicBlock::append(&function, "then");
-
-                    self.builder.position_at_end(&then_basic_block);
-
-                    let then_is_unit = then.typ == Type::Unit;
-                    let llvm_type = to_llvm_type(&then.typ).expect("llvm type");
-                    let then_value = self.expr(*then);
-
-                    let new_then_basic_block = self.builder.get_insert_block().expect("new then basic block");
-
-                    let else_basic_block = BasicBlock::append(&function, "else");
-                    self.builder.position_at_end(&else_basic_block);
-
-                    let else_value = else_.map(|else_| self.expr(*else_));
-
-                    let new_else_basic_block = self.builder.get_insert_block().expect("new else basic block");
-
-                    let merge_basic_block = BasicBlock::append(&function, "ifcont");
-                    self.builder.position_at_end(&merge_basic_block);
-
-                    let result =
-                        if then_is_unit {
-                            then_value
+                    else {
+                        let phi = self.builder.phi(llvm_type, "result");
+                        if let Some(else_value) = else_value {
+                            phi.add_incoming(&[(&then_value, &new_then_basic_block), (&else_value, &new_else_basic_block)]);
                         }
                         else {
-                            let phi = self.builder.phi(llvm_type, "result");
-                            if let Some(else_value) = else_value {
-                                phi.add_incoming(&[(&then_value, &new_then_basic_block), (&else_value, &new_else_basic_block)]);
-                            }
-                            else {
-                                phi.add_incoming(&[(&then_value, &new_then_basic_block)]);
-                            }
-                            phi
-                        };
+                            phi.add_incoming(&[(&then_value, &new_then_basic_block)]);
+                        }
+                        phi
+                    };
 
-                    self.builder.position_at_end(&start_basic_block);
-                    self.builder.cond_br(&condition, &then_basic_block, &else_basic_block);
+                self.builder.position_at_end(&start_basic_block);
+                self.builder.cond_br(&condition, &then_basic_block, &else_basic_block);
 
-                    self.builder.position_at_end(&new_then_basic_block);
-                    self.builder.br(&merge_basic_block);
+                self.builder.position_at_end(&new_then_basic_block);
+                self.builder.br(&merge_basic_block);
 
-                    self.builder.position_at_end(&new_else_basic_block);
-                    self.builder.br(&merge_basic_block);
+                self.builder.position_at_end(&new_else_basic_block);
+                self.builder.br(&merge_basic_block);
 
-                    self.builder.position_at_end(&merge_basic_block);
+                self.builder.position_at_end(&merge_basic_block);
 
-                    result
-                },
-                Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
-                Expr::Decl(declaration) => {
-                    self.declaration(*declaration, true);
-                    self.expr(dummy_nil())
-                },
-                Expr::Nil => constant::int(types::integer::int32(), 0, true), // TODO: use pointer type?
-                Expr::Oper { left, oper, right } => {
-                    let left = self.expr(*left);
-                    let right = self.expr(*right);
-                    match oper.node {
-                        Operator::And => self.builder.and(&left, &right, "and"),
-                        Operator::Divide => self.builder.div(&left, &right, "quotient"),
-                        Operator::Equal => self.builder.icmp(IntPredicate::Equal, &left, &right, "cmptmp"),
-                        Operator::Ge => self.builder.icmp(IntPredicate::SignedGreaterThanOrEqual, &left, &right, "cmptmp"),
-                        Operator::Gt => self.builder.icmp(IntPredicate::SignedGreaterThan, &left, &right, "cmptmp"),
-                        Operator::Le => self.builder.icmp(IntPredicate::SignedLesserThanOrEqual, &left, &right, "cmptmp"),
-                        Operator::Lt => self.builder.icmp(IntPredicate::SignedLesserThan, &left, &right, "cmptmp"),
-                        Operator::Minus => self.builder.sub(&left, &right, "diff"),
-                        Operator::Neq => self.builder.icmp(IntPredicate::NotEqual, &left, &right, "cmptmp"),
-                        Operator::Or => self.builder.or(&left, &right, "or"),
-                        Operator::Plus => self.builder.add(&left, &right, "sum"),
-                        Operator::Times => self.builder.mul(&left, &right, "product"),
-                    }
-                },
-                Expr::Sequence(mut exprs) => {
-                    let last_expr = exprs.pop().expect("at least one expression in sequence");
-                    for expr in exprs {
-                        self.expr(expr);
-                    }
-                    self.expr(last_expr)
-                },
-                Expr::Str { ref value } => {
-                    self.builder.global_string_ptr(value, "string")
-                },
-                Expr::Struct { fields, .. } => {
-                    let fields: Option<Vec<_>> = fields.iter().map(|field| to_llvm_type(&field.node.expr.typ)).collect();
-                    let typ = types::structure::new(&fields.expect("llvm types"), false);
-                    self.builder.alloca(typ, "struct")
-                },
-                Expr::Variable(variable) => self.variable(variable),
-                Expr::While { body, condition } => {
-                    let start_basic_block = self.builder.get_insert_block().expect("start basic block");
-                    let function = start_basic_block.get_parent();
+                result
+            },
+            Expr::Int { value } => constant::int(types::integer::int32(), value as u64, true), // TODO: use int64?
+            Expr::Decl(declaration) => {
+                self.declaration(*declaration, true);
+                self.expr(dummy_nil())
+            },
+            Expr::Nil => constant::int(types::integer::int32(), 0, true), // TODO: use pointer type?
+            Expr::Oper { left, oper, right } => {
+                let left = self.expr(*left);
+                let right = self.expr(*right);
+                match oper.node {
+                    Operator::And => self.builder.and(&left, &right, "and"),
+                    Operator::Divide => self.builder.div(&left, &right, "quotient"),
+                    Operator::Equal => self.builder.icmp(IntPredicate::Equal, &left, &right, "cmptmp"),
+                    Operator::Ge => self.builder.icmp(IntPredicate::SignedGreaterThanOrEqual, &left, &right, "cmptmp"),
+                    Operator::Gt => self.builder.icmp(IntPredicate::SignedGreaterThan, &left, &right, "cmptmp"),
+                    Operator::Le => self.builder.icmp(IntPredicate::SignedLesserThanOrEqual, &left, &right, "cmptmp"),
+                    Operator::Lt => self.builder.icmp(IntPredicate::SignedLesserThan, &left, &right, "cmptmp"),
+                    Operator::Minus => self.builder.sub(&left, &right, "diff"),
+                    Operator::Neq => self.builder.icmp(IntPredicate::NotEqual, &left, &right, "cmptmp"),
+                    Operator::Or => self.builder.or(&left, &right, "or"),
+                    Operator::Plus => self.builder.add(&left, &right, "sum"),
+                    Operator::Times => self.builder.mul(&left, &right, "product"),
+                }
+            },
+            Expr::Sequence(mut exprs) => {
+                let last_expr = exprs.pop().expect("at least one expression in sequence");
+                for expr in exprs {
+                    self.expr(expr);
+                }
+                self.expr(last_expr)
+            },
+            Expr::Str { ref value } => {
+                self.builder.global_string_ptr(value, "string")
+            },
+            Expr::Struct { fields, .. } => {
+                let fields: Option<Vec<_>> = fields.iter().map(|field| to_llvm_type(&field.node.expr.typ)).collect();
+                let typ = types::structure::new(&fields.expect("llvm types"), false);
+                self.builder.alloca(typ, "struct")
+            },
+            Expr::Variable(variable) => self.variable(variable),
+            Expr::While { body, condition } => {
+                let start_basic_block = self.builder.get_insert_block().expect("start basic block");
+                let function = start_basic_block.get_parent();
 
-                    let start_loop_basic_block = BasicBlock::append(&function, "startloop");
-                    self.builder.br(&start_loop_basic_block);
-                    self.builder.position_at_end(&start_loop_basic_block);
+                let start_loop_basic_block = BasicBlock::append(&function, "startloop");
+                self.builder.br(&start_loop_basic_block);
+                self.builder.position_at_end(&start_loop_basic_block);
 
-                    let condition = self.expr(*condition);
-                    let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "whilecond");
+                let condition = self.expr(*condition);
+                let condition = self.builder.icmp(IntPredicate::NotEqual, &condition, &constant::int(types::int1(), 0, true), "whilecond");
 
-                    let loop_basic_block = BasicBlock::append(&function, "loop");
-                    let after_basic_block = BasicBlock::append(&function, "afterloop");
-                    let previous_break_label = self.break_label.clone();
-                    self.break_label = Some(after_basic_block.clone());
-                    self.builder.cond_br(&condition, &loop_basic_block, &after_basic_block);
+                let loop_basic_block = BasicBlock::append(&function, "loop");
+                let after_basic_block = BasicBlock::append(&function, "afterloop");
+                let previous_break_label = self.break_label.clone();
+                self.break_label = Some(after_basic_block.clone());
+                self.builder.cond_br(&condition, &loop_basic_block, &after_basic_block);
 
-                    self.builder.position_at_end(&loop_basic_block);
+                self.builder.position_at_end(&loop_basic_block);
 
-                    self.expr(*body);
-                    self.break_label = previous_break_label;
-                    self.builder.br(&start_loop_basic_block);
+                self.expr(*body);
+                self.break_label = previous_break_label;
+                self.builder.br(&start_loop_basic_block);
 
-                    self.builder.position_at_end(&after_basic_block);
+                self.builder.position_at_end(&after_basic_block);
 
-                    constant::null(types::int32())
-                },
-            };
-        value
+                constant::null(types::int32())
+            },
+        }
     }
 
     fn function_declaration(&mut self, function: FuncDeclaration) {

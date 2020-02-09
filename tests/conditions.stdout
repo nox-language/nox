@@ -2,3 +2,13 @@ num > 40
 num >= 40
 num <= 42
 num >= 42
+num > 40 && num < 43
+pred1
+pred2
+pred1
+num < 40 || num < 43
+pred2
+pred2 || pred1
+pred1
+pred2
+pred1 || pred2

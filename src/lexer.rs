@@ -204,8 +204,16 @@ impl<R: Read> Lexer<R> {
         self.two_char_token(vec![('=', LesserOrEqual), ('>', NotEqual)], Lesser)
     }
 
+    fn one_or_two_ampersand(&mut self) -> Result<Token> {
+        self.two_char_token(vec![('&', AmpAmp)], Ampersand)
+    }
+
     fn one_or_two_equal(&mut self) -> Result<Token> {
         self.two_char_token(vec![('=', EqualEqual)], Equal)
+    }
+
+    fn one_or_two_pipe(&mut self) -> Result<Token> {
+        self.two_char_token(vec![('|', PipePipe)], Pipe)
     }
 
     fn make_token(&self, token: Tok, length: usize) -> Result<Token> {
@@ -334,8 +342,8 @@ impl<R: Read> Lexer<R> {
                     self.token()
                 }
                 b'=' => self.one_or_two_equal(),
-                b'&' => self.simple_token(Ampersand),
-                b'|' => self.simple_token(Pipe),
+                b'&' => self.one_or_two_ampersand(),
+                b'|' => self.one_or_two_pipe(),
                 b'.' => self.simple_token(Dot),
                 b',' => self.simple_token(Comma),
                 b';' => self.simple_token(Semicolon),
@@ -390,14 +398,14 @@ impl<R: Read> Lexer<R> {
                 },
                 _ => None,
             };
-        let token =
+        let (token, len) =
             if let Some(token) = token {
                 self.advance()?;
-                token
+                (token, 2)
             }
             else {
-                default
+                (default, 1)
             };
-        self.make_token(token, 2)
+        self.make_token(token, len)
     }
 }

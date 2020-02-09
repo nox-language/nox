@@ -20,9 +20,12 @@
  */
 
 /*
+ * TODO: rename int and int32 to i32.
+ * TODO: change <> to !=.
  * TODO: function parameters without parentheses.
  * TODO: show errors in reverse order.
  * TODO: better error messages for unclosed strings.
+ * TODO: highlight multiple lines in error message.
  * TODO: show the struct name instead of its structure in error messages.
  * FIXME: do not show type errors with invalid types.
  * FIXME: do not show type errors for undefined variable.

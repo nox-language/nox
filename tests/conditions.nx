@@ -1,3 +1,13 @@
+fun pred1(num: int): bool = (
+    print "pred1\n";
+    num > 45
+)
+
+fun pred2(num: int): bool = (
+    print "pred2\n";
+    num < 43
+)
+
 fun main() = (
     var num = 42;
     if num > 40 then
@@ -18,5 +28,23 @@ fun main() = (
     if num < 42 then
         print "num < 42\n"
     else
-        print "num >= 42\n"
+        print "num >= 42\n";
+
+    if num > 40 && num < 43 then
+        print "num > 40 && num < 43\n";
+
+    if pred1 num && pred2 num then
+        print "pred1 && pred2\n";
+
+    if pred2 num && pred1 num then
+        print "pred2 && pred1\n";
+
+    if num < 40 || num < 43 then
+        print "num < 40 || num < 43\n";
+
+    if pred2 num || pred1 num then
+        print "pred2 || pred1\n";
+
+    if pred1 num || pred2 num then
+        print "pred1 || pred2\n";
 )

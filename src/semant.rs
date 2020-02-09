@@ -139,8 +139,7 @@ impl<'a> SemanticAnalyzer<'a> {
         typ
     }
 
-    fn check_binary_op(&mut self, oper: OperatorWithPos, left: ExprWithPos, right: ExprWithPos, pos: Pos) -> TypedExpr
-    {
+    fn check_binary_op(&mut self, oper: OperatorWithPos, left: ExprWithPos, right: ExprWithPos, pos: Pos) -> TypedExpr {
         let left = Box::new(self.trans_exp(left));
         self.check_int(&left, left.pos);
         let right = Box::new(self.trans_exp(right));

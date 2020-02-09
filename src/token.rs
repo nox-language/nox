@@ -26,6 +26,7 @@ use self::Tok::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Tok {
+    AmpAmp,
     Ampersand,
     Array,
     Break,
@@ -61,6 +62,7 @@ pub enum Tok {
     OpenParen,
     OpenSquare,
     Pipe,
+    PipePipe,
     Plus,
     Semicolon,
     Slash,
@@ -85,6 +87,7 @@ impl Display for Tok {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         let string = (|| {
             let string = match *self {
+                AmpAmp => "&&",
                 Ampersand => "&",
                 Array => "array",
                 Break => "break",
@@ -120,6 +123,7 @@ impl Display for Tok {
                 OpenParen => "(",
                 OpenSquare => "[",
                 Pipe => "|",
+                PipePipe => "||",
                 Plus => "+",
                 Semicolon => ";",
                 Slash => "/",
