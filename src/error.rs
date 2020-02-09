@@ -65,6 +65,11 @@ pub enum Error {
         escape: String,
         pos: Pos,
     },
+    InvalidNumberOfParams {
+        actual: usize,
+        expected: usize,
+        pos: Pos,
+    },
     MissingField {
         ident: String,
         pos: Pos,
@@ -147,6 +152,11 @@ impl Error {
             InvalidEscape { ref escape, pos } => {
                 eprintln!("Invalid escape \\{}{}", escape, END_BOLD);
                 pos.show(symbols);
+            },
+            InvalidNumberOfParams { actual, expected, pos } => {
+                eprintln!("Invalid number of paramaters: expecting {}, but found {}{}", expected, actual, END_BOLD);
+                pos.show(symbols);
+                highlight_line(pos, symbols)?;
             },
             MissingField { ref ident, pos, ref struct_name } => {
                 eprintln!("Missing field `{}` in struct of type `{}`{}", ident, struct_name, END_BOLD);

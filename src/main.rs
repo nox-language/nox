@@ -21,7 +21,6 @@
 
 /*
  * TODO: function parameters without parentheses.
- * FIXME: missing argument to function generates a LLVM error.
  * TODO: do not use `type` as a keyword.
  * TODO: show errors in reverse order.
  * TODO: better error messages for unclosed strings.

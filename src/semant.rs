@@ -304,6 +304,13 @@ impl<'a> SemanticAnalyzer<'a> {
                     return match entry {
                         Entry::Fun { ref llvm_function, ref parameters, ref result, .. } => {
                             let mut expr_args = vec![];
+                            if parameters.len() != args.len() {
+                                self.add_error(Error::InvalidNumberOfParams {
+                                    actual: args.len(),
+                                    expected: parameters.len(),
+                                    pos,
+                                }, ());
+                            }
                             for (arg, param) in args.into_iter().zip(parameters) {
                                 let exp = self.trans_exp(arg);
                                 self.check_types(param, &exp.typ, exp.pos);
