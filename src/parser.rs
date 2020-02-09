@@ -95,7 +95,7 @@ macro_rules! eat {
                 match token.token {
                     $pat => token.pos,
                     tok => return Err(UnexpectedToken {
-                        expected: $expected,
+                        expected: $expected.to_string(),
                         pos: token.pos,
                         unexpected: tok,
                     }),
@@ -152,41 +152,90 @@ impl<'a, R: Read> Parser<'a, R> {
     fn array(&mut self) -> Result<ExprWithPos> {
         let pos = eat!(self, OpenSquare);
         let init = Box::new(self.expr()?);
-        eat!(self, Semicolon);
-        let size;
-        eat!(self, Int, size);
-        eat!(self, CloseSquare);
         let name = self.symbols.unnamed();
-        let for_value = self.symbols.unnamed();
-        Ok(WithPos::new(Expr::Sequence(vec![
-            WithPos::new(Expr::Decl(Box::new(WithPos::new(
-                Declaration::Variable {
-                    escape: false,
-                    init:
-                        WithPos::new(Expr::Array {
-                            init: init.clone(), // TODO: might not be needed anymore.
-                            size: size as usize,
-                        }, pos),
-                    name,
-                    typ: None,
-                },
-                pos))
-            ), pos),
-            // FIXME: not sure it's a good idea to do the transformations in the parser itself, because
-            // the semantic analyzer could report errors in this generated code.
-            for_loop(&mut self.symbols, for_value,
-                WithPos::new(Expr::Assign {
-                    expr: init, // TODO: might require a clone.
+        if let Semicolon = self.peek()?.token {
+            eat!(self, Semicolon, ";");
+            let size;
+            eat!(self, Int, size);
+            eat!(self, CloseSquare, "]");
+            let for_value = self.symbols.unnamed();
+            Ok(WithPos::new(Expr::Sequence(vec![
+                WithPos::new(Expr::Decl(Box::new(WithPos::new(
+                    Declaration::Variable {
+                        escape: false,
+                        init:
+                            WithPos::new(Expr::Array {
+                                init: init.clone(),
+                                size: size as usize,
+                            }, pos),
+                        name,
+                        typ: None,
+                    },
+                    pos))
+                ), pos),
+                // FIXME: not sure it's a good idea to do the transformations in the parser itself, because
+                // the semantic analyzer could report errors in this generated code.
+                for_loop(&mut self.symbols, for_value,
+                    WithPos::new(Expr::Assign {
+                        expr: init, // TODO: might require a clone.
+                        var:
+                            WithPos::new(Var::Subscript {
+                                expr: Box::new(WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(for_value, pos) }, pos)), pos)),
+                                this: Box::new(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)),
+                            }, pos)
+                    }, pos), pos,
+                    WithPos::new(Expr::Int { value: 0 }, pos),
+                    WithPos::new(Expr::Int { value: size - 1 }, pos), pos),
+                WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)), pos),
+            ]), pos))
+        }
+        else {
+            let mut exprs = vec![init];
+            if let Comma = self.peek()?.token {
+                eat!(self, Comma, ",");
+                loop {
+                    if let CloseSquare = self.peek()?.token {
+                        break;
+                    }
+                    let expr = Box::new(self.expr()?);
+                    exprs.push(expr);
+                    match self.peek()?.token {
+                        Comma => { self.token()?; },
+                        _ => break,
+                    }
+                }
+            }
+            eat!(self, CloseSquare, "]");
+            let mut sequence = vec![
+                WithPos::new(Expr::Decl(Box::new(WithPos::new(
+                    Declaration::Variable {
+                        escape: false,
+                        init:
+                            WithPos::new(Expr::Array {
+                                init: exprs[0].clone(), // NOTE: we use the first expression and that's okay because we only ever use it to know its type.
+                                size: exprs.len(),
+                            }, pos),
+                        name,
+                        typ: None,
+                    },
+                    pos))
+                ), pos),
+            ];
+            for (index, expr) in exprs.into_iter().enumerate() {
+                sequence.push(WithPos::new(Expr::Assign {
+                    expr,
                     var:
                         WithPos::new(Var::Subscript {
-                            expr: Box::new(WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(for_value, pos) }, pos)), pos)),
+                            expr: Box::new(WithPos::new(Expr::Int { value: index as i64 }, pos)),
                             this: Box::new(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)),
                         }, pos)
-                }, pos), pos,
-                WithPos::new(Expr::Int { value: 0 }, pos),
-                WithPos::new(Expr::Int { value: size - 1 }, pos), pos),
-            WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)), pos),
-        ]), pos))
+                }, pos));
+            }
+            sequence.push(
+                WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)), pos)
+            );
+            Ok(WithPos::new(Expr::Sequence(sequence), pos))
+        }
     }
 
     fn arr_ty(&mut self) -> Result<TyWithPos> {
