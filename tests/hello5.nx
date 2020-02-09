@@ -1,5 +1,5 @@
-fun hello() = print("Hello, World!\n")
-type intArray = [int; 10]
+fun hello() = print "Hello, World!\n"
+typealias intArray = [int; 10]
 
 fun main() = (
     hello;

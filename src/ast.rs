@@ -26,7 +26,8 @@ use symbol::{Symbol, SymbolWithPos};
 pub enum Declaration {
     Extern(ExternFuncDeclarationWithPos),
     Function(FuncDeclarationWithPos),
-    Type(TypeDecWithPos),
+    Struct(StructTypeWithPos),
+    TypeAlias(TypeAliasDecWithPos),
     Variable {
         escape: bool,
         init: ExprWithPos,
@@ -149,21 +150,25 @@ pub enum Ty {
     Name {
         ident: SymbolWithPos,
     },
-    Struct {
-        fields: Vec<FieldWithPos>,
-        typ: SymbolWithPos,
-    },
 }
 
+pub type TyWithPos = WithPos<Ty>;
+
 #[derive(Clone, Debug)]
-pub struct TypeDec {
+pub struct StructType {
+    pub fields: Vec<FieldWithPos>,
+    pub typ: SymbolWithPos,
+}
+
+pub type StructTypeWithPos = WithPos<StructType>;
+
+#[derive(Clone, Debug)]
+pub struct TypeAliasDec {
     pub name: SymbolWithPos,
     pub ty: TyWithPos,
 }
 
-pub type TypeDecWithPos = WithPos<TypeDec>;
-
-pub type TyWithPos = WithPos<Ty>;
+pub type TypeAliasDecWithPos = WithPos<TypeAliasDec>;
 
 #[derive(Clone, Debug)]
 pub enum Var {

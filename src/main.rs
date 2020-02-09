@@ -21,7 +21,6 @@
 
 /*
  * TODO: function parameters without parentheses.
- * TODO: do not use `type` as a keyword.
  * TODO: show errors in reverse order.
  * TODO: better error messages for unclosed strings.
  * TODO: show the struct name instead of its structure in error messages.
@@ -29,7 +28,6 @@
  * FIXME: do not show type errors for undefined variable.
  * TODO: use && instead of & for boolean comparison.
  * FIXME: global array does not compile.
- * TODO: change the struct definition syntax to `struct Name { … }`?
  * TODO: error on missing a main function.
  * TODO: call exit in main (that requires writing an alternative runtime, why?).
  */

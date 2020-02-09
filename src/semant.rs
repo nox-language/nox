@@ -40,9 +40,10 @@ use ast::{
     Operator,
     OperatorWithPos,
     StructFieldWithPos,
+    StructTypeWithPos,
     Ty,
-    TypeDecWithPos,
     TyWithPos,
+    TypeAliasDecWithPos,
     Var,
     VarWithPos,
 };
@@ -161,13 +162,17 @@ impl<'a> SemanticAnalyzer<'a> {
         }
     }
 
-    fn check_duplicate_types(&mut self, typ: &TypeDecWithPos) {
-        let mut names = HashSet::new();
-        // TODO: what is this doing? Checking that the type name is different than the right-hand
-        // side?
-        names.insert(typ.node.name.node);
+    fn check_defined_type(&mut self, typ: &SymbolWithPos) {
+        if self.env.look_type(typ.node).is_some() {
+            let ident = self.env.var_name(typ.node).to_string();
+            self.add_error(Error::DuplicateType { ident, pos: typ.pos }, ());
+        }
+    }
+
+    fn check_duplicate_types(&mut self, typ: &TypeAliasDecWithPos) {
+        // FIXME: check inner type as well when we support generics.
         if let Ty::Name { ref ident } = typ.node.ty.node {
-            if names.contains(&ident.node) {
+            if typ.node.name.node == ident.node {
                 return self.add_error(Error::Cycle {
                     pos: typ.node.ty.pos,
                 }, ());
@@ -221,13 +226,24 @@ impl<'a> SemanticAnalyzer<'a> {
                 None
             },
             Declaration::Function(function) => Some(self.trans_fun(function)),
-            Declaration::Type(type_declaration) => {
+            Declaration::Struct(struct_type) => {
+                self.check_defined_type(&struct_type.node.typ);
+                let mut struct_fields = vec![];
+                for field in &struct_type.node.fields {
+                    let typ = self.trans_ty(&field.node.typ);
+                    struct_fields.push((field.node.name, typ));
+                }
+                let new_type = Type::Struct(struct_type.node.typ.node, struct_fields, Unique::new());
+                self.env.enter_type(struct_type.node.typ.node, new_type);
+                Some(WithPos::new(tast::Declaration::Struct(self.trans_struct_type(struct_type)), declaration.pos))
+            },
+            Declaration::TypeAlias(type_declaration) => {
                 self.check_duplicate_types(&type_declaration);
                 let name = &type_declaration.node.name;
                 let new_type = self.trans_ty(&type_declaration.node.ty);
                 self.env.enter_type(name.node, new_type);
 
-                Some(WithPos::new(tast::Declaration::Type(type_declaration), declaration.pos))
+                Some(WithPos::new(tast::Declaration::TypeAlias(type_declaration), declaration.pos))
             },
             Declaration::Variable { escape, init, name, typ, .. } => {
                 let init = self.trans_exp(init);
@@ -537,7 +553,7 @@ impl<'a> SemanticAnalyzer<'a> {
         for (param, typ) in function.params.iter().zip(&parameters) {
             let value = gen::create_entry_block_alloca(&llvm_function, &self.symbol(param.node.name), &typ);
             values.push(value.clone());
-            new_params.push(WithPos::new(tast::Field {
+            new_params.push(WithPos::new(tast::Param {
                 escape: param.node.escape,
                 name: param.node.name,
                 typ: typ.clone(),
@@ -571,20 +587,27 @@ impl<'a> SemanticAnalyzer<'a> {
         WithPos::new(tast::Declaration::Function(function), pos)
     }
 
+    fn trans_struct_type(&mut self, struct_type: StructTypeWithPos) -> tast::StructTypeWithPos {
+        let mut fields = vec![];
+        for field in &struct_type.node.fields {
+            fields.push(WithPos::new(tast::Field {
+                escape: field.node.escape,
+                name: field.node.name,
+                typ: self.trans_ty(&field.node.typ),
+            }, field.pos));
+        }
+        WithPos::new(tast::StructType {
+            fields,
+            typ: struct_type.node.typ,
+        }, struct_type.pos)
+    }
+
     fn trans_ty(&mut self, ty: &TyWithPos) -> Type {
         match ty.node {
             Ty::Array { size, ref typ } => {
                 Type::Array(Box::new(self.trans_ty(typ)), size)
             },
             Ty::Name { ref ident } => self.get_type(ident, AddError),
-            Ty::Struct { ref fields, ref typ } => {
-                let mut struct_fields = vec![];
-                for field in fields {
-                    let typ = self.trans_ty(&field.node.typ);
-                    struct_fields.push((field.node.name, typ));
-                }
-                Type::Struct(typ.node, struct_fields, Unique::new())
-            },
         }
     }
 

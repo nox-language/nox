@@ -18,39 +18,39 @@ fun fib(integer: int): int =
         1
     else
         fib (integer - 1) + fib (integer - 2)
-type list = list {
+typealias list = list {
     first: int,
     rest: list
 }
-type a = b
-type b = c
-type c = int
+typealias a = b
+typealias b = c
+typealias c = int
 fun to_string2(integer: int): string = integer
 fun to_string3(integer: unexisting): string = "42"
 fun to_string4(integer: int): unexisting = "42"
 fun hello2(param: string, param: int) = print("Hello, World!\n")
 var string: string = "hello"
-type myStruct = myStruct {
+typealias myStruct = myStruct {
     myNum: int
 }
-type myStruct2 = myStruct2 {
+typealias myStruct2 = myStruct2 {
     myNum: unexisting
 }
-type intArray2 = [unexisting; 10]
+typealias intArray2 = [unexisting; 10]
 var struct: myStruct = nil
-type x1 = y1
-type y1 = z1
-type z1 = x1
-type x = y
-type y = z
-type z = z { field: x }
+typealias x1 = y1
+typealias y1 = z1
+typealias z1 = x1
+typealias x = y
+typealias y = z
+typealias z = z { field: x }
 var struct2 = nil
 var string2: string = nil
 var string2: unexisting = 42
 var string2: string = 42
 
-type intArray = [int; 40]
-type MyStruct = MyStruct { myField: int, secondField: int }
+typealias intArray = [int; 40]
+typealias MyStruct = MyStruct { myField: int, secondField: int }
 
 fun main() = (
     hello();

@@ -1,5 +1,5 @@
-type Any = Any {any: bool}
-type List = List {first: int, rest: List}
+typealias Any = Any {any: bool}
+typealias List = List {first: int, rest: List}
 
 fun readint(any: Any) : int = (
     var i = 0;

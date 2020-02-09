@@ -1,20 +1,20 @@
 fun hello() = print "Hello, World!\n"
 
-type myType = myType {
+struct myType {
     myString: [int; 10],
 }
 
-type myNum = int
+typealias myNum = int
 
-type myStruct = myStruct {
+struct myStruct {
     myNum: int
 }
 
-type myString = myString {
+struct myString {
     len: int
 }
 
-type myStruct2 = myStruct2 {
+struct myStruct2 {
     myNum2: int,
     myString: myString
 }

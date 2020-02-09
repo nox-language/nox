@@ -55,6 +55,10 @@ pub enum Error {
         ident: String,
         pos: Pos,
     },
+    DuplicateType {
+        ident: String,
+        pos: Pos,
+    },
     Eof,
     ExtraField {
         ident: String,
@@ -143,6 +147,11 @@ impl Error {
             DuplicateParam { ref ident, pos } => {
                 eprintln!("Duplicate parameter name `{}`{}", ident, END_BOLD);
                 pos.show(symbols);
+            },
+            DuplicateType { ref ident, pos } => {
+                eprintln!("Duplicate type name `{}`{}", ident, END_BOLD);
+                pos.show(symbols);
+                highlight_line(pos, symbols)?;
             },
             Eof => eprintln!("end of file"),
             ExtraField { ref ident, pos, ref struct_name } => {

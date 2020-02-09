@@ -23,7 +23,7 @@ use rlvm::{Value, module::Function};
 
 use ast::{
     OperatorWithPos,
-    TypeDecWithPos,
+    TypeAliasDecWithPos,
 };
 use position::{Pos, WithPos};
 use symbol::{Symbol, SymbolWithPos};
@@ -32,7 +32,8 @@ use types::Type;
 #[derive(Clone, Debug)]
 pub enum Declaration {
     Function(TypedFuncDeclaration),
-    Type(TypeDecWithPos),
+    Struct(StructTypeWithPos),
+    TypeAlias(TypeAliasDecWithPos),
     Variable {
         escape: bool,
         init: TypedExpr,
@@ -103,17 +104,26 @@ pub struct Field {
     pub escape: bool,
     pub name: Symbol,
     pub typ: Type,
-    pub value: Value,
 }
 
 pub type FieldWithPos = WithPos<Field>;
+
+#[derive(Clone, Debug)]
+pub struct Param {
+    pub escape: bool,
+    pub name: Symbol,
+    pub typ: Type,
+    pub value: Value,
+}
+
+pub type ParamWithPos = WithPos<Param>;
 
 #[derive(Clone, Debug)]
 pub struct FuncDeclaration {
     pub body: TypedExpr,
     pub llvm_function: Function,
     pub name: Symbol,
-    pub params: Vec<FieldWithPos>,
+    pub params: Vec<ParamWithPos>,
     pub result_type: Type,
 }
 
@@ -126,6 +136,14 @@ pub struct StructField {
 }
 
 pub type TypedStructField = WithPos<StructField>;
+
+#[derive(Clone, Debug)]
+pub struct StructType {
+    pub fields: Vec<FieldWithPos>,
+    pub typ: SymbolWithPos,
+}
+
+pub type StructTypeWithPos = WithPos<StructType>;
 
 #[derive(Clone, Debug)]
 pub enum Var {

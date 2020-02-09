@@ -164,7 +164,7 @@ impl Gen {
                     self.function_declaration(function.node);
                 }
             },
-            Declaration::Type { .. } => (), // TODO: should we generate a llvm type declaration?
+            Declaration::Struct(_) | Declaration::TypeAlias { .. } => (), // TODO: should we generate a llvm type declaration?
             Declaration::Variable { init, value, .. } => {
                 match init.typ {
                     Type::Array(ref typ, size) => {

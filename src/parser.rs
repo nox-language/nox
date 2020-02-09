@@ -48,10 +48,11 @@ use ast::{
     Operator,
     StructField,
     StructFieldWithPos,
+    StructType,
     Ty,
-    TypeDec,
-    TypeDecWithPos,
     TyWithPos,
+    TypeAliasDec,
+    TypeAliasDecWithPos,
     Var,
     VarWithPos,
     dummy_var_expr,
@@ -601,15 +602,22 @@ impl<'a, R: Read> Parser<'a, R> {
         Ok(WithPos::new(Expr::Sequence(sequence), pos))
     }
 
-    fn struct_ty(&mut self, typ: Symbol, pos: Pos) -> Result<TyWithPos> {
-        let typ = WithPos::new(typ, pos);
+    fn struct_ty(&mut self) -> Result<DeclarationWithPos> {
+        let pos = eat!(self, Struct);
+        let struct_name;
+        let type_pos = eat!(self, Ident, struct_name);
+        let typ = self.symbols.symbol(&struct_name);
+        let typ = WithPos::new(typ, type_pos);
         eat!(self, OpenCurly);
         let fields = self.fields(CloseCurly)?;
-        eat!(self, CloseCurly);
-        Ok(WithPos::new(Ty::Struct {
-            fields,
-            typ,
-        }, pos))
+        let end_pos = eat!(self, CloseCurly);
+        let pos = pos.grow(end_pos);
+        Ok(WithPos::new(Declaration::Struct(
+            WithPos::new(StructType {
+                fields,
+                typ,
+            }, pos),
+        ), pos))
     }
 
     fn relational_expr(&mut self) -> Result<ExprWithPos> {
@@ -679,33 +687,28 @@ impl<'a, R: Read> Parser<'a, R> {
                 let type_name;
                 let pos = eat!(self, Ident, type_name);
                 let ident = self.symbols.symbol(&type_name);
-                if self.peek()?.token == OpenCurly {
-                    self.struct_ty(ident, pos)
-                }
-                else {
-                    Ok(WithPos::new(Ty::Name {
-                        ident: WithPos::new(ident, pos),
-                    }, pos))
-                }
+                Ok(WithPos::new(Ty::Name {
+                    ident: WithPos::new(ident, pos),
+                }, pos))
             },
             _ => Err(self.unexpected_token("[ or identifier")?),
         }
     }
 
-    fn ty_decs(&mut self) -> Result<DeclarationWithPos> {
+    fn type_dec(&mut self) -> Result<DeclarationWithPos> {
         let dec = self.ty_dec()?;
         let pos = dec.pos;
-        Ok(WithPos::new(Declaration::Type(dec), pos))
+        Ok(WithPos::new(Declaration::TypeAlias(dec), pos))
     }
 
-    fn ty_dec(&mut self) -> Result<TypeDecWithPos> {
-        let pos = eat!(self, Type);
+    fn ty_dec(&mut self) -> Result<TypeAliasDecWithPos> {
+        let pos = eat!(self, Typealias);
         let type_name;
         let name_pos = eat!(self, Ident, type_name);
         let name = self.symbols.symbol(&type_name);
         eat!(self, Equal);
         let ty = self.ty()?;
-        Ok(WithPos::new(TypeDec {
+        Ok(WithPos::new(TypeAliasDec {
             name: WithPos::new(name, name_pos),
             ty,
         }, pos))
@@ -787,7 +790,8 @@ impl<'a, R: Read> Parser<'a, R> {
                             let pos = function.pos;
                             declarations.push(WithPos::new(Declaration::Function(function), pos));
                         },
-                        Type => declarations.push(self.ty_decs()?),
+                        Struct => declarations.push(self.struct_ty()?),
+                        Typealias => declarations.push(self.type_dec()?),
                         Var => declarations.push(self.var_dec(Global)?),
                         _ => return Err(self.unexpected_token("fun, type or var")?),
                     }

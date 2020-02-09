@@ -1,4 +1,4 @@
-type Tree = Tree {key: string, left: Tree, right: Tree}
+typealias Tree = Tree {key: string, left: Tree, right: Tree}
 
 fun prettyprint(tree: Tree): string = (
     var output = "";
