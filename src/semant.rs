@@ -261,20 +261,20 @@ impl<'a> SemanticAnalyzer<'a> {
     }
 
     pub fn trans_exp(&mut self, expr: ExprWithPos) -> TypedExpr {
+        let pos = expr.pos;
         match expr.node {
             Expr::Array { init, size } => {
                 let init_expr = self.trans_exp(*init);
                 TypedExpr {
                     typ: Type::Array(Box::new(init_expr.typ.clone()), size),
                     expr: tast::Expr::Array { init: Box::new(init_expr), size },
-                    pos: expr.pos,
+                    pos,
                 }
             },
             Expr::Assign { expr, var } => {
                 let var = self.trans_var(var);
                 let expr = Box::new(self.trans_exp(*expr));
                 self.check_types(&var.typ, &expr.typ, expr.pos);
-                let pos = expr.pos;
                 TypedExpr {
                     expr: tast::Expr::Assign { expr, var },
                     pos,
@@ -284,18 +284,18 @@ impl<'a> SemanticAnalyzer<'a> {
             Expr::Bool(value) =>
                 TypedExpr {
                     expr: tast::Expr::Bool(value),
-                    pos: expr.pos,
+                    pos,
                     typ: Type::Bool,
                 },
             Expr::Break => {
                 if !self.in_loop {
                     return self.add_error(Error::BreakOutsideLoop {
-                        pos: expr.pos,
+                        pos,
                     }, exp_type_error());
                 }
                 TypedExpr {
                     expr: tast::Expr::Break,
-                    pos: expr.pos,
+                    pos,
                     typ: Type::Unit,
                 }
             },
@@ -311,25 +311,25 @@ impl<'a> SemanticAnalyzer<'a> {
                             }
                             TypedExpr {
                                 expr: tast::Expr::Call { args: expr_args, llvm_function: llvm_function.clone() },
-                                pos: expr.pos,
+                                pos,
                                 typ: self.actual_ty_var(result),
                             }
                         },
                         _ => unreachable!(),
                     };
                 }
-                return self.undefined_function(function, expr.pos);
+                return self.undefined_function(function, pos);
             },
             Expr::EmptyTuple => {
                 TypedExpr {
                     expr: tast::Expr::EmptyTuple,
-                    pos: expr.pos,
+                    pos,
                     typ: Type::Unit,
                 }
             },
             Expr::If { else_, condition, then } => {
                 let condition = Box::new(self.trans_exp(*condition));
-                self.check_bool(&condition, then.pos);
+                self.check_bool(&condition, condition.pos);
                 let if_expr = Box::new(self.trans_exp(*then));
                 let (else_, typ) =
                     match else_ {
@@ -345,14 +345,14 @@ impl<'a> SemanticAnalyzer<'a> {
                     };
                 TypedExpr {
                     expr: tast::Expr::If { else_, condition, then: if_expr },
-                    pos: expr.pos,
+                    pos,
                     typ,
                 }
             },
             Expr::Int { value } =>
                 TypedExpr {
                     expr: tast::Expr::Int { value },
-                    pos: expr.pos,
+                    pos,
                     typ: Type::Int32,
                 },
             Expr::Decl(declaration) => {
@@ -365,7 +365,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     Some(declaration) =>
                         TypedExpr {
                             expr: tast::Expr::Decl(Box::new(declaration)),
-                            pos: expr.pos,
+                            pos,
                             typ: Type::Unit,
                         },
                     None => exp_type_error(),
@@ -374,7 +374,7 @@ impl<'a> SemanticAnalyzer<'a> {
             Expr::Nil =>
                 TypedExpr {
                     expr: tast::Expr::Nil,
-                    pos: expr.pos,
+                    pos,
                     typ: Type::Nil,
                 },
             Expr::Oper { left, oper: oper@WithPos { node: Operator::Plus, .. }, right }
@@ -383,7 +383,7 @@ impl<'a> SemanticAnalyzer<'a> {
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::And, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Or, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Divide, .. }, right } =>
-                self.check_binary_op(oper, *left, *right, expr.pos),
+                self.check_binary_op(oper, *left, *right, pos),
             Expr::Oper { left, oper: oper@WithPos { node: Operator::Equal, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Neq, .. }, right }
             | Expr::Oper { left, oper: oper@WithPos { node: Operator::Lt, .. }, right }
@@ -396,7 +396,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 self.check_int(&right, right.pos);
                 TypedExpr {
                     expr: tast::Expr::Oper { left, oper: oper.clone(), right },
-                    pos: expr.pos,
+                    pos,
                     typ: Type::Bool,
                 }
             },
@@ -434,7 +434,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
                 TypedExpr {
                     expr: tast::Expr::Struct { fields: field_exprs, typ },
-                    pos: expr.pos,
+                    pos,
                     typ: ty,
                 }
             },
@@ -447,14 +447,14 @@ impl<'a> SemanticAnalyzer<'a> {
                 let typ = new_exprs.last().cloned().expect("Unexpected empty sequence").typ;
                 TypedExpr {
                     expr: tast::Expr::Sequence(new_exprs),
-                    pos: expr.pos,
+                    pos,
                     typ,
                 }
             },
             Expr::Str { ref value } =>
                 TypedExpr {
                     expr: tast::Expr::Str { value: value.clone() },
-                    pos: expr.pos,
+                    pos,
                     typ: Type::String,
                 },
             Expr::Variable(var) => {
@@ -462,7 +462,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 let typ = var.typ.clone();
                 TypedExpr {
                     expr: tast::Expr::Variable(var),
-                    pos: expr.pos,
+                    pos,
                     typ,
                 }
             },
@@ -473,7 +473,6 @@ impl<'a> SemanticAnalyzer<'a> {
                 self.in_loop = true;
                 let body = Box::new(self.trans_exp(*body));
                 self.in_loop = old_in_loop;
-                let pos = body.pos;
                 TypedExpr {
                     expr: tast::Expr::While {
                         body,

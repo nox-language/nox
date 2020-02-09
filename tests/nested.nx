@@ -1,13 +1,13 @@
 fun f() = (
-    var v := 6;
+    var v = 6;
     printi(v);
     (
-        var v := 7;
+        var v = 7;
         printi(v)
     );
     printi(v);
     (
-        var v := 8;
+        var v = 8;
         printi(v)
     );
     printi(v)

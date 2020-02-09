@@ -1,4 +1,4 @@
 fun main() = (
-    var N := 8;
+    var N = 8;
     print(")
 )

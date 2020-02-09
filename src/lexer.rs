@@ -72,10 +72,6 @@ impl<R: Read> Lexer<R> {
         Ok(())
     }
 
-    fn colon_and_optional_equal(&mut self) -> Result<Token> {
-        self.two_char_token(vec![('=', ColonEqual)], Colon)
-    }
-
     fn comment(&mut self) -> Result<()> {
         let mut depth = 1;
         loop {
@@ -207,6 +203,10 @@ impl<R: Read> Lexer<R> {
         self.two_char_token(vec![('=', LesserOrEqual), ('>', NotEqual)], Lesser)
     }
 
+    fn one_or_two_equal(&mut self) -> Result<Token> {
+        self.two_char_token(vec![('=', EqualEqual)], Equal)
+    }
+
     fn make_token(&self, token: Tok, length: usize) -> Result<Token> {
         if length > 10000 {
             panic!();
@@ -332,7 +332,7 @@ impl<R: Read> Lexer<R> {
                     self.advance()?;
                     self.token()
                 }
-                b'=' => self.simple_token(Equal),
+                b'=' => self.one_or_two_equal(),
                 b'&' => self.simple_token(Ampersand),
                 b'|' => self.simple_token(Pipe),
                 b'.' => self.simple_token(Dot),
@@ -347,7 +347,7 @@ impl<R: Read> Lexer<R> {
                 b')' => self.simple_token(CloseParen),
                 b'[' => self.simple_token(OpenSquare),
                 b']' => self.simple_token(CloseSquare),
-                b':' => self.colon_and_optional_equal(),
+                b':' => self.simple_token(Colon),
                 b'>' => self.greater_or_greater_equal(),
                 b'<' => self.lesser_or_lesser_equal_or_not_equal(),
                 b'/' => self.slash_or_comment(),

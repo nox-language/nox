@@ -1,8 +1,8 @@
 fun main() = (
-    var n := 10;
-    var minus_n := -n;
-    var addition := n + 2 + minus_n;
-    var result := minus_n / addition;
+    var n = 10;
+    var minus_n = -n;
+    var addition = n + 2 + minus_n;
+    var result = minus_n / addition;
     printi(10 / 2);
     printi(minus_n);
     printi(addition);

@@ -4,16 +4,16 @@ type Point = Point {
 }
 
 fun main() = (
-    var point := Point {
+    var point = Point {
         x = 42,
         y = 24,
     };
     printi(point.x);
     printi(point.y);
-    point.y := 100;
+    point.y = 100;
     printi(point.x);
     printi(point.y);
-    point.x := 200;
+    point.x = 200;
     printi(point.x);
     printi(point.y)
 )

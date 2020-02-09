@@ -1,5 +1,5 @@
 fun main() = (
-    var num := 42;
+    var num = 42;
     if num > 40 then
         print("num > 40\n")
     else

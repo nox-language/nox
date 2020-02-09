@@ -29,7 +29,7 @@ fun to_string2(integer: int): string = integer
 fun to_string3(integer: unexisting): string = "42"
 fun to_string4(integer: int): unexisting = "42"
 fun hello2(param: string, param: int) = print("Hello, World!\n")
-var string: string := "hello"
+var string: string = "hello"
 type myStruct = myStruct {
     myNum: int
 }
@@ -37,50 +37,50 @@ type myStruct2 = myStruct2 {
     myNum: unexisting
 }
 type intArray2 = [unexisting; 10]
-var struct: myStruct := nil
+var struct: myStruct = nil
 type x1 = y1
 type y1 = z1
 type z1 = x1
 type x = y
 type y = z
 type z = z { field: x }
-var struct2 := nil
-var string2: string := nil
-var string2: unexisting := 42
-var string2: string := 42
+var struct2 = nil
+var string2: string = nil
+var string2: unexisting = 42
+var string2: string = 42
 
 type intArray = [int; 40]
 type MyStruct = MyStruct { myField: int, secondField: int }
 
 fun main() = (
     hello();
-    var value := 42;
-    var arrayOfInt := [10; 42];
-    var arrayOfString := ["hello"; 10];
-    var arrayOfString := ["test"; 42];
-    var none := value := 10;
-    var none2 := value := "test";
-    var struct := MyStruct
+    var value = 42;
+    var arrayOfInt = [10; 42];
+    var arrayOfString = ["hello"; 10];
+    var arrayOfString = ["test"; 42];
+    var none = value = 10;
+    var none2 = value = "test";
+    var struct = MyStruct
         { myField = 10
         , secondField = 42
         };
-    var struct2 := int
+    var struct2 = int
         { myField = 10
         , secondField = 42
         };
-    var struct2 := MyStruct
+    var struct2 = MyStruct
         { myField = 10
         , secondField = 42
         , secondField2 = 42
         };
-    var struct2 := MyStruct
+    var struct2 = MyStruct
         { myField = 10
         };
-    var struct2 := MyStruct
+    var struct2 = MyStruct
         { myField = "10"
         , secondField = 42
         };
-    var struct2 := MyStruct2
+    var struct2 = MyStruct2
         { myField = 10
         , secondField = 42
         };
@@ -94,17 +94,17 @@ fun main() = (
     print("42");
     print("string");
     print("test");
-    string := "10";
+    string = "10";
     break;
-    for i := "test" to 10 do
+    for i = "test" to 10 do
         print(to_string(i));
-    for i := 0 to "test" do
+    for i = 0 to "test" do
         print(to_string(i));
     while "10" do
         print(to_string(10));
     while 10 do
         print(to_string(10));
-    for i := 0 to 10 do (
+    for i = 0 to 10 do (
         print(to_string(i));
         fun hello2(param: string) = (
             print("Hello, World!\n");

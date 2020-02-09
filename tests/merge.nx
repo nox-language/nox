@@ -2,26 +2,26 @@ type Any = Any {any: bool}
 type List = List {first: int, rest: List}
 
 fun readint(any: Any) : int = (
-    var i := 0;
+    var i = 0;
     fun isdigit(s : string) : bool =
         ord(buffer) >= ord("0") & ord(buffer) <= ord("9");
     while buffer = " " | buffer = "\n" do
-        buffer := getchar();
-    any.any := isdigit(buffer);
+        buffer = getchar();
+    any.any = isdigit(buffer);
     while isdigit(buffer) do (
-        i := i * 10 + ord(buffer) - ord("0");
-        buffer := getchar()
+        i = i * 10 + ord(buffer) - ord("0");
+        buffer = getchar()
     );
     i
 )
 
 fun readlist() : List = (
-    var any := Any { any = 0 };
-    var i := readint(any);
+    var any = Any { any = 0 };
+    var i = readint(any);
     if any.any then
         List { first = i, rest = readlist() }
     else (
-        buffer := getchar();
+        buffer = getchar();
         nil
     )
 )
@@ -62,6 +62,6 @@ fun printlist(l: List) =
     )
 
 fun main() = (
-    var buffer := getchar();
+    var buffer = getchar();
     printlist(merge(readlist(), readlist()))
 )

@@ -135,6 +135,12 @@ Déréférencement de pointeur en suffixe genre ptr*.field avec probablement un 
 
 writev for atomic printf?
 
+== Package manager (lumos)
+
+Read this article: https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527
+
 == No-go
 
 No implicit variant for enum.
+RAII (but that seems useful for Rc)
+Partial function application

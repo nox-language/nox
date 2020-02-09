@@ -1,9 +1,9 @@
-var N: int := 8
+var N: int = 8
 
 fun main() =
     /*
-     *  var B := 42
-     /* var C := 12
+     *  var B = 42
+     /* var C = 12
       */
      */
     print("N\n")

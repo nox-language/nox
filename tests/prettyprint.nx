@@ -1,14 +1,14 @@
 type Tree = Tree {key: string, left: Tree, right: Tree}
 
 fun prettyprint(tree: Tree): string = (
-    var output := "";
+    var output = "";
     fun write(s: string) =
-        output := concat(output, s);
+        output = concat(output, s);
     fun show(n: int, t: Tree) = (
         fun indent(s: string) =
-            (for i := 0 to n
+            (for i = 0 to n
                 do write(" ");
-                output := concat(output, s);
+                output = concat(output, s);
                 write("\n"));
         if t = nil then
             indent(".")

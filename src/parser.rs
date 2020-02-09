@@ -310,7 +310,7 @@ impl<'a, R: Read> Parser<'a, R> {
         let pos = eat!(self, For);
         let var_name;
         let var_pos = eat!(self, Ident, var_name);
-        eat!(self, ColonEqual);
+        eat!(self, Equal);
         let start = self.expr()?;
         eat!(self, To);
         let end = self.expr()?;
@@ -440,10 +440,10 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn lvalue_or_assign(&mut self, var: VarWithPos) -> Result<ExprWithPos> {
         let var = self.lvalue(var)?;
-        if let ColonEqual = self.peek()?.token {
-            eat!(self, ColonEqual);
+        if let Equal = self.peek()?.token {
+            eat!(self, Equal);
             let expr = Box::new(self.expr()?);
-            let pos = expr.pos;
+            let pos = var.pos.grow(expr.pos);
             Ok(WithPos::new(Expr::Assign {
                 expr,
                 var,
@@ -572,7 +572,7 @@ impl<'a, R: Read> Parser<'a, R> {
         loop {
             let oper =
                 match self.peek_token() {
-                    Ok(&Equal) => WithPos::new(Operator::Equal, eat!(self, Equal)),
+                    Ok(&EqualEqual) => WithPos::new(Operator::Equal, eat!(self, EqualEqual)),
                     Ok(&Greater) => WithPos::new(Operator::Gt, eat!(self, Greater)),
                     Ok(&GreaterOrEqual) => WithPos::new(Operator::Ge, eat!(self, GreaterOrEqual)),
                     Ok(&Lesser) => WithPos::new(Operator::Lt, eat!(self, Lesser)),
@@ -690,7 +690,7 @@ impl<'a, R: Read> Parser<'a, R> {
         eat!(self, Ident, var_name);
         let typ = self.optional_type()?;
         let name = self.symbols.symbol(&var_name);
-        eat!(self, ColonEqual);
+        eat!(self, Equal);
         let init = self.expr()?;
         match scope {
             Global => {

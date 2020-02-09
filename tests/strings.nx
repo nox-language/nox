@@ -6,7 +6,7 @@ fun main() = (
     print("\n");
     /*if "a" = "a" then // TODO: uncomment
         print("true\n");*/
-    var char := getchar();
+    var char = getchar();
     print(char);
     print("\n")
 )
