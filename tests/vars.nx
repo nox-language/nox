@@ -6,4 +6,5 @@ fun main() = (
     printi i;
     printi j;
     printi k;
+    var l = k = 1;
 )

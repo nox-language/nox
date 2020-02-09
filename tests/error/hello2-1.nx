@@ -1,24 +1,24 @@
 /* Hello-world with function */
-fun hello(param: string) = print("Hello, World!\n")
+fun hello(param: string) = print "Hello, World!\n"
 fun to_string(integer: int): string = "42"
 fun odd(integer: int): int =
-    if integer = 1 then
+    if integer == 1 then
         1
     else
         even (integer - 1)
 fun even(integer: int): int =
-    if integer = 0 then
+    if integer == 0 then
         1
     else
         odd (integer - 1)
 fun fib(integer: int): int =
-    if integer = 0 then
+    if integer == 0 then
         1
-    else if integer = 1 then
+    else if integer == 1 then
         1
     else
         fib (integer - 1) + fib (integer - 2)
-typealias list = list {
+struct list {
     first: int,
     rest: list
 }
@@ -28,39 +28,39 @@ typealias c = int
 fun to_string2(integer: int): string = integer
 fun to_string3(integer: unexisting): string = "42"
 fun to_string4(integer: int): unexisting = "42"
-fun hello2(param: string, param: int) = print("Hello, World!\n")
+fun hello2(param: string, param: int) = print "Hello, World!\n"
 var string: string = "hello"
-typealias myStruct = myStruct {
+struct myStruct {
     myNum: int
 }
-typealias myStruct2 = myStruct2 {
+struct myStruct2 {
     myNum: unexisting
 }
 typealias intArray2 = [unexisting; 10]
-var struct: myStruct = nil
+var myStruct: myStruct = nil
 typealias x1 = y1
 typealias y1 = z1
 typealias z1 = x1
 typealias x = y
 typealias y = z
-typealias z = z { field: x }
+struct z { field: x }
 var struct2 = nil
 var string2: string = nil
 var string2: unexisting = 42
 var string2: string = 42
 
 typealias intArray = [int; 40]
-typealias MyStruct = MyStruct { myField: int, secondField: int }
+struct MyStruct { myField: int, secondField: int }
 
 fun main() = (
-    hello();
+    hello;
     var value = 42;
     var arrayOfInt = [10; 42];
     var arrayOfString = ["hello"; 10];
     var arrayOfString = ["test"; 42];
     var none = value = 10;
-    var none2 = value = "test";
-    var struct = MyStruct
+    var none2 = value == "test";
+    var myStruct = MyStruct
         { myField = 10
         , secondField = 42
         };
@@ -84,34 +84,34 @@ fun main() = (
         { myField = 10
         , secondField = 42
         };
-    arrayOfInt[0] = 42;
-    string[0] = 42;
-    arrayOfInt["0"] = 42;
-    arrayOfInt[0] = "42";
-    struct.myField = 42;
-    struct.myField2 = 42;
-    struct.myField = "42";
-    print("42");
-    print("string");
-    print("test");
+    arrayOfInt.[0] = 42;
+    string.[0] = 42;
+    arrayOfInt.["0"] = 42;
+    arrayOfInt.[0] = "42";
+    myStruct.myField = 42;
+    myStruct.myField2 = 42;
+    myStruct.myField = "42";
+    print "42";
+    print "string";
+    print "test";
     string = "10";
     break;
     for i = "test" to 10 do
-        print(to_string(i));
+        print (to_string i);
     for i = 0 to "test" do
-        print(to_string(i));
+        print (to_string i);
     while "10" do
-        print(to_string(10));
+        print (to_string 10);
     while 10 do
-        print(to_string(10));
+        print (to_string 10);
     for i = 0 to 10 do (
-        print(to_string(i));
+        print (to_string i);
         fun hello2(param: string) = (
-            print("Hello, World!\n");
+            print "Hello, World!\n";
             break
         );
         break
     );
-    print(value);
-    print(param)
+    print value;
+    print param;
 )

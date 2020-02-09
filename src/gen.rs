@@ -61,17 +61,18 @@ use types::Type;
 pub fn to_llvm_type(typ: &Type) -> Option<rlvm::types::Type> {
     let typ =
         match *typ {
+            Type::Array(ref typ, size) => types::array::array(to_llvm_type(typ)?, size),
             Type::Bool => types::integer::int1(),
             Type::Int32 => types::integer::int32(), // TODO: int64?
+            Type::Name(ref _symbol, ref _type) => unimplemented!(),
+            Type::Nil => types::integer::int32(), // TODO: int64 or pointer type?
             Type::String => types::pointer::new(types::int8(), 0),
             Type::Struct(_, ref fields, _) => {
                 let types: Option<Vec<_>> = fields.iter().map(|(_symbol, typ)| to_llvm_type(typ)).collect();
                 types::structure::new(&types?, false)
             },
-            Type::Array(ref typ, size) => types::array::array(to_llvm_type(typ)?, size),
-            Type::Nil => types::integer::int32(), // TODO: int64 or pointer type?
             Type::Unit => types::void(),
-            Type::Name(ref _symbol, ref _type) => unimplemented!(),
+            Type::Void => types::void(),
             Type::Error => return None,
         };
     Some(typ)
@@ -87,6 +88,9 @@ fn to_llvm_type_or_dummy(typ: &Type) -> rlvm::types::Type {
 }
 
 pub fn create_entry_block_alloca(function: &Function, variable_name: &str, typ: &Type) -> Value {
+    if *typ == Type::Unit {
+        return constant::int(types::int32(), 0, true);
+    }
     let basic_block = function.get_entry_basic_block();
     let instruction = basic_block.get_first_instruction();
     let builder = Builder::new();
@@ -99,7 +103,13 @@ pub fn function(module: &Module, result_type: &Type, params: &[Type], name: Symb
     let param_types: Vec<_> = params.iter()
         .map(|typ| to_llvm_type_or_dummy(&typ))
         .collect();
-    let result_type = to_llvm_type_or_dummy(&result_type);
+    let result_type =
+        if Some(name) == strings.symbol("main") {
+            to_llvm_type(&Type::Void).expect("void type to llvm")
+        }
+        else {
+            to_llvm_type_or_dummy(&result_type)
+        };
     let function_type = types::function::new(result_type, &param_types, false);
     let function = module.add_function(&strings.get(name).expect("symbol"), function_type);
     function.append_basic_block("entry");
@@ -180,6 +190,7 @@ impl Gen {
                         let init_value = self.expr(init);
                         self.builder.mem_move(&value, align, &init_value, align, &size);
                     },
+                    Type::Unit => { self.expr(init); },
                     _ => {
                         let init_value = self.expr(init);
                         self.builder.store(&init_value, &value);
@@ -196,6 +207,7 @@ impl Gen {
                 self.builder.alloca(typ, "array")
             },
             Expr::Assign { expr, var } => {
+                let pos = expr.pos;
                 match expr.typ {
                     Type::Array(_, _) | Type::Struct(_, _, _) => {
                         let size_of = size_of(&expr.typ);
@@ -203,14 +215,15 @@ impl Gen {
                         let value = self.expr(*expr);
                         let variable = self.variable_address(var);
                         let size = constant::int(types::int32(), size_of as u64, true);
-                        self.builder.mem_move(&variable, align, &value, align, &size)
+                        self.builder.mem_move(&variable, align, &value, align, &size);
                     },
                     _ => {
                         let value = self.expr(*expr);
                         let variable = self.variable_address(var);
-                        self.builder.store(&value, &variable)
+                        self.builder.store(&value, &variable);
                     },
                 }
+                self.expr(empty_tuple(pos))
             },
             Expr::Bool(value) => {
                 constant::int(types::int1(), value as u64, true)
@@ -470,5 +483,13 @@ fn dummy_nil() -> TypedExpr {
         expr: Expr::Nil,
         typ: Type::Unit,
         pos: Pos::dummy(),
+    }
+}
+
+fn empty_tuple(pos: Pos) -> TypedExpr {
+    TypedExpr {
+        expr: Expr::EmptyTuple,
+        pos,
+        typ: Type::Unit,
     }
 }

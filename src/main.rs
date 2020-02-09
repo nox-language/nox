@@ -20,6 +20,7 @@
  */
 
 /*
+ * FIXME: better error when using array[index] instead of array.[index].
  * TODO: rename int and int32 to i32.
  * TODO: function parameters without parentheses.
  * TODO: show errors in reverse order.
@@ -29,7 +30,7 @@
  * FIXME: do not show type errors with invalid types.
  * FIXME: do not show type errors for undefined variable.
  * FIXME: global array does not compile.
- * TODO: error on missing a main function.
+ * TODO: error on missing (or multiple) a main function.
  * TODO: call exit in main (that requires writing an alternative runtime, why?).
  */
 

@@ -26,14 +26,15 @@ use symbol::{Symbol, SymbolWithPos};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
+    Array(Box<Type>, usize),
     Bool,
     Int32,
+    Name(SymbolWithPos, Box<Type>),
+    Nil,
     String,
     Struct(Symbol, Vec<(Symbol, Type)>, Unique),
-    Array(Box<Type>, usize),
-    Nil,
     Unit,
-    Name(SymbolWithPos, Box<Type>),
+    Void,
     Error,
 }
 
@@ -41,8 +42,17 @@ impl Display for Type {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         let string =
             match *self {
+                Array(ref typ, size) => {
+                    write!(formatter, "[{}; {}]", typ, size)?;
+                    return Ok(());
+                },
                 Bool => "bool".to_string(),
                 Int32 => "int32".to_string(),
+                Name(_, ref typ) => {
+                    typ.fmt(formatter)?;
+                    return Ok(());
+                },
+                Nil => "nil".to_string(),
                 String => "string".to_string(),
                 Struct(_, ref types, _) => {
                     write!(formatter, "{{")?;
@@ -55,16 +65,8 @@ impl Display for Type {
                     }
                     "}".to_string()
                 },
-                Array(ref typ, size) => {
-                    write!(formatter, "[{}; {}]", typ, size)?;
-                    return Ok(());
-                },
-                Nil => "nil".to_string(),
                 Unit => "()".to_string(),
-                Name(_, ref typ) => {
-                    typ.fmt(formatter)?;
-                    return Ok(());
-                },
+                Void => "void".to_string(),
                 Error => "type error".to_string(),
             };
         write!(formatter, "{}", string)

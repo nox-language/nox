@@ -11,7 +11,7 @@ fun main() = (
         x = ["42"; 1],
         y = 24
     }; 1];
-    if point[0].x[0] = add(1, 2) then
+    if point.[0].x.[0] == add 1 2 then
         print("point.x = 42");
     var test: string = 1 & 2;
     var test: string = 1 | 2;
@@ -19,6 +19,6 @@ fun main() = (
     var test: string = 1 > 2;
     var test: string = 1 + 2;
     var test: string = -2;
-    if Point { x = ["42"; 1], y = 42 } = if true then "42" else "24" then
-        print("")
+    if Point { x = ["42"; 1], y = 42 } == if true then "42" else "24" then
+        print ""
 )

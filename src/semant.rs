@@ -198,7 +198,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     return;
                 }
             }
-            return self.add_error(Error::Type {
+            self.add_error(Error::Type {
                 expected: expected.clone(),
                 pos,
                 unexpected: unexpected.clone(),
@@ -530,7 +530,15 @@ impl<'a> SemanticAnalyzer<'a> {
 
         let result_type =
             if let Some(ref result) = function.result {
-                self.trans_ty(result)
+                let return_type = self.trans_ty(result);
+                if Some(function.name) == self.strings.symbol("main") {
+                    self.add_error(Error::Type {
+                        expected: Type::Unit,
+                        pos,
+                        unexpected: return_type.clone(),
+                    }, ());
+                }
+                return_type
             }
             else {
                 Type::Unit

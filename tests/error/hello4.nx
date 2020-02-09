@@ -1,5 +1,5 @@
 fun main() = ( variable
-; -variable[0]
+; -variable.[0]
 ; MyStruct {
     myField = 10
 }
@@ -8,15 +8,15 @@ fun main() = ( variable
     , secondField = 42
     }
 ; variable = 10
-; variable[42] = 10
+; variable.[42] = 10
 ; var arrayOfInt = [42; 10]
-; print("hello")
-; if 10 then print("10")
-; if 10 then print("10") else print("not 10")
+; print "hello"
+; if 10 then print "10"
+; if 10 then print "10" else print "not 10"
 ; while 10 do (
-      print("10");
+      print "10";
       break
   )
 ; for i = 0 to 10 do
-      print(i)
+      print i
 )

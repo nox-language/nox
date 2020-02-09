@@ -46,6 +46,13 @@ impl Strings {
         let strings = self.strings.borrow();
         strings.get(&symbol).map(Clone::clone)
     }
+
+    pub fn symbol(&self, string: &str) -> Option<Symbol> {
+        debug_assert!(!string.is_empty());
+
+        self.strings.borrow().iter().find(|&(_, value)| value == string)
+            .map(|(&key, _)| key)
+    }
 }
 
 #[derive(Debug)]
