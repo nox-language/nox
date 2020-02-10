@@ -78,6 +78,7 @@ use lexer::Lexer;
 use parser::Parser;
 use semant::SemanticAnalyzer;
 use symbol::{Strings, Symbols};
+use terminal::Terminal;
 
 fn main() {
     let _llvm = llvm_init();
@@ -92,7 +93,8 @@ fn main() {
     let strings = Rc::new(Strings::new());
     let mut symbols = Symbols::new(Rc::clone(&strings));
     if let Err(error) = drive(strings, &mut symbols) {
-        if let Err(error) = error.show(&symbols) {
+        let terminal = Terminal::new();
+        if let Err(error) = error.show(&symbols, &terminal) {
             eprintln!("Error printing errors: {}", error);
         }
     }

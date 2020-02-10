@@ -1,0 +1,6 @@
+fun main() = (
+    if 12 then
+        print "Hello\n";
+    print 12;
+    printi "hello";
+)

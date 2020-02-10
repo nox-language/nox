@@ -53,7 +53,6 @@ fn test_execution() {
     ];
 
     for file in &files {
-        println!("{}", file);
         let _ = remove_file(format!("./tests/{}", file));
         Command::new("./target/debug/nox")
             .arg(&format!("tests/{}.nx", file))
@@ -69,8 +68,30 @@ fn test_execution() {
         }
         let mut buffer = vec![];
         let read_size = child.stdout.expect("stdout").read_to_end(&mut buffer).expect("output");
-        let output = &buffer[..read_size];
-        let expected_output = fs::read(format!("./tests/{}.stdout", file)).expect("read");
+        let output = String::from_utf8_lossy(&buffer[..read_size]);
+        let expected_output = String::from_utf8(fs::read(format!("./tests/{}.stdout", file)).expect("read")).expect("String::from_utf8");
+        assert_eq!(output, &*expected_output, "{}.nx", file);
+    }
+}
+
+#[test]
+fn test_errors() {
+    // TODO: take all files ending with .nx?
+    let files = [
+        "types",
+    ];
+
+    for file in &files {
+        let _ = remove_file(format!("./tests/{}", file));
+        let child = Command::new("./target/debug/nox")
+            .arg(&format!("tests/error/{}.nx", file))
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn");
+        let mut buffer = vec![];
+        let read_size = child.stderr.expect("stderr").read_to_end(&mut buffer).expect("output");
+        let output = String::from_utf8_lossy(&buffer[..read_size]);
+        let expected_output = String::from_utf8(fs::read(format!("./tests/error/{}.stderr", file)).expect("read")).expect("String::from_utf8");
         assert_eq!(output, &*expected_output, "{}.nx", file);
     }
 }

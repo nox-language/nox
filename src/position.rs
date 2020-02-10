@@ -23,12 +23,7 @@ use std::fmt::{self, Display, Debug, Formatter};
 use std::{u32, u64};
 
 use symbol::{Symbol, Symbols};
-use terminal::{
-    BLUE,
-    BOLD,
-    END_BOLD,
-    RESET_COLOR,
-};
+use terminal::Terminal;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Pos {
@@ -40,9 +35,9 @@ pub struct Pos {
 }
 
 impl Pos {
-    pub fn show(&self, symbols: &Symbols<()>) {
+    pub fn show(&self, symbols: &Symbols<()>, terminal: &Terminal) {
         let filename = symbols.name(self.file);
-        eprintln!("   {}{}-->{}{} {}:{}:{}", BOLD, BLUE, RESET_COLOR, END_BOLD, filename, self.line, self.column)
+        eprintln!("   {}{}-->{}{} {}:{}:{}", terminal.bold(), terminal.blue(), terminal.reset_color(), terminal.end_bold(), filename, self.line, self.column)
     }
 }
 

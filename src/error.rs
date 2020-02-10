@@ -27,13 +27,7 @@ use std::result;
 use position::Pos;
 use self::Error::*;
 use symbol::Symbols;
-use terminal::{
-    BLUE,
-    BOLD,
-    END_BOLD,
-    RED,
-    RESET_COLOR,
-};
+use terminal::Terminal;
 use token::Tok;
 use types::Type;
 
@@ -123,95 +117,95 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn show(&self, symbols: &Symbols<()>) -> io::Result<()> {
+    pub fn show(&self, symbols: &Symbols<()>, terminal: &Terminal) -> io::Result<()> {
         if let Multi(ref errors) = *self {
             for error in errors {
-                error.show(symbols)?;
+                error.show(symbols, terminal)?;
             }
             return Ok(());
         }
-        eprint!("{}{}error: {}", BOLD, RED, RESET_COLOR);
+        eprint!("{}{}error: {}", terminal.bold(), terminal.red(), terminal.reset_color());
         match *self {
             BreakOutsideLoop { pos } => {
-                eprintln!("Break statement used outside of loop{}", END_BOLD);
-                pos.show(symbols);
+                eprintln!("Break statement used outside of loop{}", terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             CannotIndex { pos, ref typ } => {
-                eprintln!("Cannot index value of type `{}`{}", typ, END_BOLD);
-                pos.show(symbols)
+                eprintln!("Cannot index value of type `{}`{}", typ, terminal.end_bold());
+                pos.show(symbols, terminal)
             },
             Cycle { pos } => {
-                eprintln!("Type cycle detected:{}", END_BOLD);
-                pos.show(symbols);
+                eprintln!("Type cycle detected:{}", terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             DuplicateParam { ref ident, pos } => {
-                eprintln!("Duplicate parameter name `{}`{}", ident, END_BOLD);
-                pos.show(symbols);
+                eprintln!("Duplicate parameter name `{}`{}", ident, terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             DuplicateType { ref ident, pos } => {
-                eprintln!("Duplicate type name `{}`{}", ident, END_BOLD);
-                pos.show(symbols);
-                highlight_line(pos, symbols)?;
+                eprintln!("Duplicate type name `{}`{}", ident, terminal.end_bold());
+                pos.show(symbols, terminal);
+                highlight_line(pos, symbols, terminal)?;
             },
             Eof => eprintln!("end of file"),
             ExtraField { ref ident, pos, ref struct_name } => {
-                eprintln!("Extra field `{}` in struct of type `{}`{}", ident, struct_name, END_BOLD);
-                pos.show(symbols);
+                eprintln!("Extra field `{}` in struct of type `{}`{}", ident, struct_name, terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             InvalidEscape { ref escape, pos } => {
-                eprintln!("Invalid escape \\{}{}", escape, END_BOLD);
-                pos.show(symbols);
+                eprintln!("Invalid escape \\{}{}", escape, terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             InvalidNumberOfParams { actual, expected, pos } => {
-                eprintln!("Invalid number of paramaters: expecting {}, but found {}{}", expected, actual, END_BOLD);
-                pos.show(symbols);
-                highlight_line(pos, symbols)?;
+                eprintln!("Invalid number of paramaters: expecting {}, but found {}{}", expected, actual, terminal.end_bold());
+                pos.show(symbols, terminal);
+                highlight_line(pos, symbols, terminal)?;
             },
             MissingField { ref ident, pos, ref struct_name } => {
-                eprintln!("Missing field `{}` in struct of type `{}`{}", ident, struct_name, END_BOLD);
-                pos.show(symbols);
+                eprintln!("Missing field `{}` in struct of type `{}`{}", ident, struct_name, terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             Msg(ref string) => eprintln!("{}", string),
             Multi(_) => unreachable!(),
             NotAStruct { pos, ref typ } => {
-                eprintln!("Type `{}` is not a struct type{}", typ, END_BOLD);
-                pos.show(symbols);
-                highlight_line(pos, symbols)?;
+                eprintln!("Type `{}` is not a struct type{}", typ, terminal.end_bold());
+                pos.show(symbols, terminal);
+                highlight_line(pos, symbols, terminal)?;
             },
             Error::StructType { pos } => {
-                eprintln!("Expecting type when value is nil{}", END_BOLD);
-                pos.show(symbols);
+                eprintln!("Expecting type when value is nil{}", terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             Error::Type { ref expected, pos, ref unexpected } => {
-                eprintln!("Unexpected type {}, expecting {}{}", unexpected, expected, END_BOLD);
-                pos.show(symbols);
-                highlight_line(pos, symbols)?;
+                eprintln!("Unexpected type {}, expecting {}{}", unexpected, expected, terminal.end_bold());
+                pos.show(symbols, terminal);
+                highlight_line(pos, symbols, terminal)?;
             },
             Unclosed { pos, token } => {
-                eprintln!("Unclosed {} starting{}", token, END_BOLD);
-                pos.show(symbols);
+                eprintln!("Unclosed {} starting{}", token, terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             Undefined { ref ident, ref item, pos } => {
-                eprintln!("Undefined {} `{}`{}", item, ident, END_BOLD);
-                pos.show(symbols);
-                highlight_line(pos, symbols)?;
+                eprintln!("Undefined {} `{}`{}", item, ident, terminal.end_bold());
+                pos.show(symbols, terminal);
+                highlight_line(pos, symbols, terminal)?;
             },
             UnexpectedField { ref ident, pos, ref struct_name } => {
-                eprintln!("Unexpected field `{}` in struct of type `{}`{}", ident, struct_name, END_BOLD);
-                pos.show(symbols);
+                eprintln!("Unexpected field `{}` in struct of type `{}`{}", ident, struct_name, terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             UnexpectedToken { ref expected, pos, ref unexpected } => {
-                eprintln!("Unexpected token {}, expecting {}{}", unexpected, expected, END_BOLD);
-                pos.show(symbols);
-                highlight_line(pos, symbols)?;
+                eprintln!("Unexpected token {}, expecting {}{}", unexpected, expected, terminal.end_bold());
+                pos.show(symbols, terminal);
+                highlight_line(pos, symbols, terminal)?;
             },
             UnexpectedType { ref kind, pos } => {
-                eprintln!("Expecting {} type{}", kind, END_BOLD);
-                pos.show(symbols);
+                eprintln!("Expecting {} type{}", kind, terminal.end_bold());
+                pos.show(symbols, terminal);
             },
             UnknownToken { pos, ref start } => {
-                eprintln!("Unexpected start of token `{}`{}", start, END_BOLD);
-                pos.show(symbols);
+                eprintln!("Unexpected start of token `{}`{}", start, terminal.end_bold());
+                pos.show(symbols, terminal);
             },
         }
         eprintln!("");
@@ -220,7 +214,7 @@ impl Error {
     }
 }
 
-fn highlight_line(pos: Pos, symbols: &Symbols<()>) -> io::Result<()> {
+fn highlight_line(pos: Pos, symbols: &Symbols<()>, terminal: &Terminal) -> io::Result<()> {
     let filename = symbols.name(pos.file);
     let mut file = File::open(filename)?;
     // TODO: support longer lines.
@@ -240,12 +234,12 @@ fn highlight_line(pos: Pos, symbols: &Symbols<()>) -> io::Result<()> {
     let line = &buffer[start_of_line..end_of_line];
     let num_spaces = num_text_size(pos.line as i64);
     let spaces = " ".repeat(num_spaces);
-    eprintln!("{}{}{} |", BOLD, BLUE, spaces);
-    eprintln!("{} |{}{} {}", pos.line, END_BOLD, RESET_COLOR, String::from_utf8_lossy(line));
+    eprintln!("{}{}{} |", terminal.bold(), terminal.blue(), spaces);
+    eprintln!("{} |{}{} {}", pos.line, terminal.end_bold(), terminal.reset_color(), String::from_utf8_lossy(line));
     let count = min(pos.column as usize, line.len());
     let spaces_before_hint = " ".repeat(count);
     let hint = "^".repeat(pos.length);
-    eprintln!("{}{}{} |{}{}{}{}", BOLD, BLUE, spaces, RED, spaces_before_hint, hint, RESET_COLOR);
+    eprintln!("{}{}{} |{}{}{}{}", terminal.bold(), terminal.blue(), spaces, terminal.red(), spaces_before_hint, hint, terminal.reset_color());
     Ok(())
 }
 
