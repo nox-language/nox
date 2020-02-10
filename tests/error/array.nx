@@ -1,0 +1,4 @@
+fun main() = (
+    var a = [0; 12];
+    var value = a[0];
+)

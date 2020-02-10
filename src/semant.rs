@@ -19,6 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+mod msg;
+
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -50,6 +52,7 @@ use ast::{
 use env::{Env, Entry};
 use error::{Error, Result};
 use gen;
+use self::msg::call_with_array_help;
 use position::{Pos, WithPos};
 use self::AddError::*;
 use symbol::{Strings, Symbol, SymbolWithPos};
@@ -315,7 +318,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 }
             },
             Expr::Call { args, function } => {
-                if let Some(entry@Entry::Fun { .. }) = self.env.look_var(function).cloned() { // TODO: remove this clone.
+                if let Some(entry@Entry::Fun { .. }) = self.env.look_var(function.node).cloned() { // TODO: remove this clone.
                     return match entry {
                         Entry::Fun { ref llvm_function, ref parameters, ref result, .. } => {
                             let mut expr_args = vec![];
@@ -340,7 +343,8 @@ impl<'a> SemanticAnalyzer<'a> {
                         _ => unreachable!(),
                     };
                 }
-                return self.undefined_function(function, pos);
+                let help = call_with_array_help(&args, &self.env, &function, &self.strings);
+                return self.undefined_function(function.node, function.pos, help);
             },
             Expr::EmptyTuple => {
                 TypedExpr {
@@ -718,9 +722,10 @@ impl<'a> SemanticAnalyzer<'a> {
         self.strings.get(symbol).expect("symbol")
     }
 
-    fn undefined_function(&mut self, ident: Symbol, pos: Pos) -> TypedExpr {
+    fn undefined_function(&mut self, ident: Symbol, pos: Pos, help: Option<String>) -> TypedExpr {
         let ident = self.env.var_name(ident).to_string();
         self.add_error(Error::Undefined {
+            help,
             ident,
             item: "function".to_string(),
             pos,
@@ -730,6 +735,7 @@ impl<'a> SemanticAnalyzer<'a> {
     fn undefined_type(&mut self, symbol: &SymbolWithPos) -> Type {
         let ident = self.env.type_name(symbol.node);
         self.add_error(Error::Undefined {
+            help: None,
             ident,
             item: "type".to_string(),
             pos: symbol.pos,
@@ -739,6 +745,7 @@ impl<'a> SemanticAnalyzer<'a> {
     fn undefined_variable(&mut self, ident: Symbol, pos: Pos) -> TypedVar {
         let ident = self.env.var_name(ident).to_string();
         self.add_error(Error::Undefined {
+            help: None,
             ident,
             item: "variable".to_string(),
             pos,

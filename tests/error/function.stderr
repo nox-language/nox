@@ -1,0 +1,6 @@
+error: Undefined function `func`
+   --> tests/error/function.nx:2:17
+  |
+2 |     var value = func 0;
+  |                 ^^^^
+

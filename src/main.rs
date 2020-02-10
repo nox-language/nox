@@ -21,6 +21,7 @@
 
 /*
  * FIXME: better error when using array[index] instead of array.[index].
+ * TODO: single-line comment.
  * TODO: rename int and int32 to i32.
  * TODO: function parameters without parentheses.
  * TODO: show errors in reverse order.

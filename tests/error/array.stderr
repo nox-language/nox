@@ -1,0 +1,6 @@
+error: Undefined function `a`
+   --> tests/error/array.nx:3:17
+  |
+3 |     var value = a[0];
+  |                 ^ help: try the array indexing syntax a.[0]
+

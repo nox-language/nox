@@ -306,7 +306,7 @@ impl<'a, R: Read> Parser<'a, R> {
                 let end_pos = args.last().map(|expr| expr.pos).unwrap();
                 Ok(WithPos::new(Expr::Call {
                     args,
-                    function: symbol,
+                    function: WithPos::new(symbol, pos),
                 }, pos.grow(end_pos)))
             },
             _ => {

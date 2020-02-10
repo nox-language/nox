@@ -52,7 +52,7 @@ pub enum Expr {
     Break,
     Call {
         args: Vec<ExprWithPos>,
-        function: Symbol,
+        function: SymbolWithPos,
     },
     Decl(Box<DeclarationWithPos>),
     EmptyTuple,

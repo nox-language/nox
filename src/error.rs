@@ -92,6 +92,7 @@ pub enum Error {
         token: &'static str,
     },
     Undefined {
+        help: Option<String>,
         ident: String,
         item: String,
         pos: Pos,
@@ -145,7 +146,7 @@ impl Error {
             DuplicateType { ref ident, pos } => {
                 eprintln!("Duplicate type name `{}`{}", ident, terminal.end_bold());
                 pos.show(symbols, terminal);
-                highlight_line(pos, symbols, terminal)?;
+                highlight_line(pos, symbols, terminal, None)?;
             },
             Eof => eprintln!("end of file"),
             ExtraField { ref ident, pos, ref struct_name } => {
@@ -159,7 +160,7 @@ impl Error {
             InvalidNumberOfParams { actual, expected, pos } => {
                 eprintln!("Invalid number of paramaters: expecting {}, but found {}{}", expected, actual, terminal.end_bold());
                 pos.show(symbols, terminal);
-                highlight_line(pos, symbols, terminal)?;
+                highlight_line(pos, symbols, terminal, None)?;
             },
             MissingField { ref ident, pos, ref struct_name } => {
                 eprintln!("Missing field `{}` in struct of type `{}`{}", ident, struct_name, terminal.end_bold());
@@ -170,7 +171,7 @@ impl Error {
             NotAStruct { pos, ref typ } => {
                 eprintln!("Type `{}` is not a struct type{}", typ, terminal.end_bold());
                 pos.show(symbols, terminal);
-                highlight_line(pos, symbols, terminal)?;
+                highlight_line(pos, symbols, terminal, None)?;
             },
             Error::StructType { pos } => {
                 eprintln!("Expecting type when value is nil{}", terminal.end_bold());
@@ -179,16 +180,16 @@ impl Error {
             Error::Type { ref expected, pos, ref unexpected } => {
                 eprintln!("Unexpected type {}, expecting {}{}", unexpected, expected, terminal.end_bold());
                 pos.show(symbols, terminal);
-                highlight_line(pos, symbols, terminal)?;
+                highlight_line(pos, symbols, terminal, None)?;
             },
             Unclosed { pos, token } => {
                 eprintln!("Unclosed {} starting{}", token, terminal.end_bold());
                 pos.show(symbols, terminal);
             },
-            Undefined { ref ident, ref item, pos } => {
+            Undefined { ref help, ref ident, ref item, pos } => {
                 eprintln!("Undefined {} `{}`{}", item, ident, terminal.end_bold());
                 pos.show(symbols, terminal);
-                highlight_line(pos, symbols, terminal)?;
+                highlight_line(pos, symbols, terminal, help.as_ref())?;
             },
             UnexpectedField { ref ident, pos, ref struct_name } => {
                 eprintln!("Unexpected field `{}` in struct of type `{}`{}", ident, struct_name, terminal.end_bold());
@@ -197,7 +198,7 @@ impl Error {
             UnexpectedToken { ref expected, pos, ref unexpected } => {
                 eprintln!("Unexpected token {}, expecting {}{}", unexpected, expected, terminal.end_bold());
                 pos.show(symbols, terminal);
-                highlight_line(pos, symbols, terminal)?;
+                highlight_line(pos, symbols, terminal, None)?;
             },
             UnexpectedType { ref kind, pos } => {
                 eprintln!("Expecting {} type{}", kind, terminal.end_bold());
@@ -214,7 +215,7 @@ impl Error {
     }
 }
 
-fn highlight_line(pos: Pos, symbols: &Symbols<()>, terminal: &Terminal) -> io::Result<()> {
+fn highlight_line(pos: Pos, symbols: &Symbols<()>, terminal: &Terminal, help: Option<&String>) -> io::Result<()> {
     let filename = symbols.name(pos.file);
     let mut file = File::open(filename)?;
     // TODO: support longer lines.
@@ -239,7 +240,10 @@ fn highlight_line(pos: Pos, symbols: &Symbols<()>, terminal: &Terminal) -> io::R
     let count = min(pos.column as usize, line.len());
     let spaces_before_hint = " ".repeat(count);
     let hint = "^".repeat(pos.length);
-    eprintln!("{}{}{} |{}{}{}{}", terminal.bold(), terminal.blue(), spaces, terminal.red(), spaces_before_hint, hint, terminal.reset_color());
+    let help = help
+        .map(|help| format!(" help: {}", help))
+        .unwrap_or_default();
+    eprintln!("{}{}{} |{}{}{}{}{}", terminal.bold(), terminal.blue(), spaces, terminal.red(), spaces_before_hint, hint, help, terminal.reset_color());
     Ok(())
 }
 

@@ -78,6 +78,8 @@ fn test_execution() {
 fn test_errors() {
     // TODO: take all files ending with .nx?
     let files = [
+        "array",
+        "function",
         "types",
     ];
 
