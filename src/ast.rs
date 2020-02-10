@@ -31,7 +31,7 @@ pub enum Declaration {
     Variable {
         escape: bool,
         init: ExprWithPos,
-        name: Symbol,
+        name: SymbolWithPos,
         typ: Option<TyWithPos>,
     },
 }
@@ -99,7 +99,7 @@ pub type FieldWithPos = WithPos<Field>;
 #[derive(Clone, Debug)]
 pub struct FuncDeclaration {
     pub body: ExprWithPos,
-    pub name: Symbol,
+    pub name: SymbolWithPos,
     pub params: Vec<FieldWithPos>,
     pub result: Option<TyWithPos>,
 }

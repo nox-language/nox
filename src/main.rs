@@ -29,7 +29,7 @@
  * FIXME: do not show type errors with invalid types.
  * FIXME: do not show type errors for undefined variable.
  * FIXME: global array does not compile.
- * TODO: error on missing (or multiple) a main function.
+ * TODO: error when having a variable named main.
  * TODO: call exit in main (that requires writing an alternative runtime, why?).
  */
 
@@ -112,7 +112,7 @@ fn drive(strings: Rc<Strings>, symbols: &mut Symbols<()>) -> Result<(), Error> {
         let mut env = Env::new(&strings, &module);
         {
             let semantic_analyzer = SemanticAnalyzer::new(&mut env, Rc::clone(&strings), &module);
-            let functions = semantic_analyzer.analyze(ast)?;
+            let functions = semantic_analyzer.analyze(ast, file_symbol)?;
             env.end_scope(); // TODO: move after the semantic analysis?
 
             let mut gen = Gen::new(module);

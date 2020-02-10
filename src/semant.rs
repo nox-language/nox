@@ -106,17 +106,29 @@ impl<'a> SemanticAnalyzer<'a> {
         }
     }
 
-    fn add_error<T>(&mut self, error: Error, node: T) -> T {
+    fn add_error(&mut self, error: Error) {
         self.errors.push(error);
+    }
+
+    fn add_error_or<T>(&mut self, error: Error, node: T) -> T {
+        self.add_error(error);
         node
     }
 
-    pub fn analyze(mut self, declarations: Vec<DeclarationWithPos>) -> Result<Vec<TypedDeclaration>> {
+    pub fn analyze(mut self, declarations: Vec<DeclarationWithPos>, file_symbol: Symbol) -> Result<Vec<TypedDeclaration>> {
         let mut result = vec![];
         for declaration in declarations {
             if let Some(declaration) = self.trans_dec(declaration) {
                 result.push(declaration);
             }
+        }
+        if let Some(main_symbol) = self.strings.symbol("main") {
+            if let Some(Entry::Var { .. }) = self.env.look_var(main_symbol) {
+                self.add_error(Error::NoMainFunction(Pos::new(1, 1, 0, file_symbol, 1)));
+            }
+        }
+        else {
+            self.add_error(Error::NoMainFunction(Pos::new(1, 1, 0, file_symbol, 1)));
         }
         if self.errors.is_empty() {
             Ok(result)
@@ -156,18 +168,18 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn check_bool(&mut self, expr: &TypedExpr, pos: Pos) {
         if expr.typ != Type::Bool && expr.typ != Type::Error {
-            return self.add_error(Error::Type {
+            self.add_error(Error::Type {
                 expected: Type::Bool,
                 pos,
                 unexpected: expr.typ.clone(),
-            }, ());
+            });
         }
     }
 
     fn check_defined_type(&mut self, typ: &SymbolWithPos) {
         if self.env.look_type(typ.node).is_some() {
             let ident = self.env.var_name(typ.node).to_string();
-            self.add_error(Error::DuplicateType { ident, pos: typ.pos }, ());
+            self.add_error(Error::Duplicate { ident, item: "type name", pos: typ.pos });
         }
     }
 
@@ -175,20 +187,20 @@ impl<'a> SemanticAnalyzer<'a> {
         // FIXME: check inner type as well when we support generics.
         if let Ty::Name { ref ident } = typ.node.ty.node {
             if typ.node.name.node == ident.node {
-                return self.add_error(Error::Cycle {
+                self.add_error(Error::Cycle {
                     pos: typ.node.ty.pos,
-                }, ());
+                });
             }
         }
     }
 
     fn check_int(&mut self, expr: &TypedExpr, pos: Pos) {
         if expr.typ != Type::Int32 && expr.typ != Type::Error {
-            return self.add_error(Error::Type {
+            self.add_error(Error::Type {
                 expected: Type::Int32,
                 pos,
                 unexpected: expr.typ.clone(),
-            }, ());
+            });
         }
     }
 
@@ -205,7 +217,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 expected: expected.clone(),
                 pos,
                 unexpected: unexpected.clone(),
-            }, ());
+            });
         }
     }
 
@@ -256,7 +268,7 @@ impl<'a> SemanticAnalyzer<'a> {
                         Some(typ)
                     }
                     else if init.typ == Type::Nil {
-                        return self.add_error(Error::StructType { pos: declaration.pos }, None);
+                        return self.add_error_or(Error::StructType { pos: declaration.pos }, None);
                     }
                     else if init.typ == Type::Error {
                         // TODO: print error here?
@@ -265,6 +277,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     else {
                         None
                     };
+                let name = name.node;
                 let value = gen::create_entry_block_alloca(&self.current_function(), &self.symbol(name), &init.typ);
                 self.env.enter_var(name, Entry::Var { typ: init.typ.clone(), value: value.clone() });
                 Some(WithPos::new(tast::Declaration::Variable {
@@ -307,7 +320,7 @@ impl<'a> SemanticAnalyzer<'a> {
                 },
             Expr::Break => {
                 if !self.in_loop {
-                    return self.add_error(Error::BreakOutsideLoop {
+                    return self.add_error_or(Error::BreakOutsideLoop {
                         pos,
                     }, exp_type_error());
                 }
@@ -327,7 +340,7 @@ impl<'a> SemanticAnalyzer<'a> {
                                     actual: args.len(),
                                     expected: parameters.len(),
                                     pos,
-                                }, ());
+                                });
                             }
                             for (arg, param) in args.into_iter().zip(parameters) {
                                 let exp = self.trans_exp(arg);
@@ -453,7 +466,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     },
                     Type::Error => (),
                     _ =>
-                        return self.add_error(Error::UnexpectedType {
+                        return self.add_error_or(Error::UnexpectedType {
                             kind: "struct".to_string(),
                             pos: typ.pos,
                         }, exp_type_error()),
@@ -532,15 +545,27 @@ impl<'a> SemanticAnalyzer<'a> {
             }
         }
 
+        let function_name = function.name.node;
+        if Some(function_name) == self.strings.symbol("main") {
+            if let Some(Entry::Fun { .. }) = self.env.look_var(function_name) {
+                let ident = self.env.var_name(function_name).to_string();
+                self.add_error(Error::Duplicate {
+                    ident,
+                    item: "function",
+                    pos: pos.grow(function.name.pos),
+                })
+            }
+        }
+
         let result_type =
             if let Some(ref result) = function.result {
                 let return_type = self.trans_ty(result);
-                if Some(function.name) == self.strings.symbol("main") {
+                if Some(function_name) == self.strings.symbol("main") {
                     self.add_error(Error::Type {
                         expected: Type::Unit,
                         pos,
                         unexpected: return_type.clone(),
-                    }, ());
+                    });
                 }
                 return_type
             }
@@ -555,7 +580,7 @@ impl<'a> SemanticAnalyzer<'a> {
             param_names.push(param.node.name);
             }
 
-        let llvm_function = gen::function(&self.module, &result_type, &parameters, function.name, &self.strings);
+        let llvm_function = gen::function(&self.module, &result_type, &parameters, function_name, &self.strings);
         let previous_function = self.current_function.clone();
         self.current_function = Some(llvm_function.clone());
 
@@ -572,7 +597,7 @@ impl<'a> SemanticAnalyzer<'a> {
             }, param.pos));
             }
 
-        self.env.enter_var(function.name, Entry::Fun {
+        self.env.enter_var(function_name, Entry::Fun {
             llvm_function: llvm_function.clone(),
             parameters: parameters.clone(),
             result: result_type.clone(),
@@ -588,7 +613,7 @@ impl<'a> SemanticAnalyzer<'a> {
         let function = WithPos::new(tast::FuncDeclaration {
             body: exp,
             llvm_function,
-            name: function.name,
+            name: function_name,
             params: new_params,
             result_type,
         }, pos);
@@ -643,7 +668,7 @@ impl<'a> SemanticAnalyzer<'a> {
                         self.unexpected_field(&ident, ident.pos, struct_type)
                     },
                     typ =>
-                        return self.add_error(Error::NotAStruct {
+                        return self.add_error_or(Error::NotAStruct {
                             pos: this.pos,
                             typ: typ.to_string(),
                         }, var_type_error()),
@@ -681,7 +706,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     },
                     Type::Error => var_type_error(),
                     typ =>
-                        self.add_error(Error::CannotIndex {
+                        self.add_error_or(Error::CannotIndex {
                             pos: var.pos,
                             typ: typ.to_string(),
                         }, var_type_error()),
@@ -692,16 +717,17 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn duplicate_param(&mut self, param: &FieldWithPos) {
         let ident = self.env.var_name(param.node.name).to_string();
-        self.add_error(Error::DuplicateParam {
+        self.add_error(Error::Duplicate {
             ident,
+            item: "param name",
             pos: param.pos,
-        }, ())
+        })
     }
 
     fn extra_field(&mut self, field: &StructFieldWithPos, typ: &SymbolWithPos) -> TypedExpr {
         let ident = self.env.type_name(field.node.ident);
         let struct_name = self.env.type_name(typ.node);
-        self.add_error(Error::ExtraField {
+        self.add_error_or(Error::ExtraField {
             ident,
             pos: field.pos,
             struct_name,
@@ -711,7 +737,7 @@ impl<'a> SemanticAnalyzer<'a> {
     fn missing_field(&mut self, field_type: Symbol, typ: &SymbolWithPos) -> TypedExpr {
         let ident = self.env.type_name(field_type);
         let struct_name = self.env.type_name(typ.node);
-        self.add_error(Error::MissingField {
+        self.add_error_or(Error::MissingField {
             ident,
             pos: typ.pos,
             struct_name,
@@ -724,7 +750,7 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn undefined_function(&mut self, ident: Symbol, pos: Pos, help: Option<String>) -> TypedExpr {
         let ident = self.env.var_name(ident).to_string();
-        self.add_error(Error::Undefined {
+        self.add_error_or(Error::Undefined {
             help,
             ident,
             item: "function".to_string(),
@@ -734,7 +760,7 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn undefined_type(&mut self, symbol: &SymbolWithPos) -> Type {
         let ident = self.env.type_name(symbol.node);
-        self.add_error(Error::Undefined {
+        self.add_error_or(Error::Undefined {
             help: None,
             ident,
             item: "type".to_string(),
@@ -744,7 +770,7 @@ impl<'a> SemanticAnalyzer<'a> {
 
     fn undefined_variable(&mut self, ident: Symbol, pos: Pos) -> TypedVar {
         let ident = self.env.var_name(ident).to_string();
-        self.add_error(Error::Undefined {
+        self.add_error_or(Error::Undefined {
             help: None,
             ident,
             item: "variable".to_string(),
@@ -755,7 +781,7 @@ impl<'a> SemanticAnalyzer<'a> {
     fn unexpected_field(&mut self, ident: &SymbolWithPos, pos: Pos, typ: Symbol) -> TypedVar {
         let ident = self.env.type_name(ident.node);
         let struct_name = self.env.type_name(typ);
-        self.add_error(Error::UnexpectedField {
+        self.add_error_or(Error::UnexpectedField {
             ident,
             pos,
             struct_name,

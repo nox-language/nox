@@ -80,6 +80,8 @@ fn test_errors() {
     let files = [
         "array",
         "function",
+        "multiple_main",
+        "no_main",
         "types",
     ];
 

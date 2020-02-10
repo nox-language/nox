@@ -178,7 +178,7 @@ impl<'a, R: Read> Parser<'a, R> {
     fn array(&mut self) -> Result<ExprWithPos> {
         let pos = eat!(self, OpenSquare);
         let init = Box::new(self.expr()?);
-        let name = self.symbols.unnamed();
+        let name = WithPos::new(self.symbols.unnamed(), pos);
         if let Semicolon = self.peek()?.token {
             eat!(self, Semicolon, ";");
             let size;
@@ -194,7 +194,7 @@ impl<'a, R: Read> Parser<'a, R> {
                                 init: init.clone(),
                                 size: size as usize,
                             }, pos),
-                        name,
+                        name: name.clone(),
                         typ: None,
                     },
                     pos))
@@ -207,12 +207,12 @@ impl<'a, R: Read> Parser<'a, R> {
                         var:
                             WithPos::new(Var::Subscript {
                                 expr: Box::new(WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(for_value, pos) }, pos)), pos)),
-                                this: Box::new(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)),
+                                this: Box::new(WithPos::new(Var::Simple { ident: name.clone() }, pos)),
                             }, pos)
                     }, pos), pos,
                     WithPos::new(Expr::Int { value: 0 }, pos),
                     WithPos::new(Expr::Int { value: size - 1 }, pos), pos),
-                WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)), pos),
+                WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: name }, pos)), pos),
             ]), pos))
         }
         else {
@@ -241,7 +241,7 @@ impl<'a, R: Read> Parser<'a, R> {
                                 init: exprs[0].clone(), // NOTE: we use the first expression and that's okay because we only ever use it to know its type.
                                 size: exprs.len(),
                             }, pos),
-                        name,
+                        name: name.clone(),
                         typ: None,
                     },
                     pos))
@@ -253,12 +253,12 @@ impl<'a, R: Read> Parser<'a, R> {
                     var:
                         WithPos::new(Var::Subscript {
                             expr: Box::new(WithPos::new(Expr::Int { value: index as i64 }, pos)),
-                            this: Box::new(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)),
+                            this: Box::new(WithPos::new(Var::Simple { ident: name.clone() }, pos)),
                         }, pos)
                 }, pos));
             }
             sequence.push(
-                WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)), pos)
+                WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: name }, pos)), pos)
             );
             Ok(WithPos::new(Expr::Sequence(sequence), pos))
         }
@@ -413,8 +413,8 @@ impl<'a, R: Read> Parser<'a, R> {
     fn fun_dec(&mut self) -> Result<FuncDeclarationWithPos> {
         let pos = eat!(self, Fun);
         let func_name;
-        eat!(self, Ident, func_name);
-        let name = self.symbols.symbol(&func_name);
+        let name_pos = eat!(self, Ident, func_name);
+        let name = WithPos::new(self.symbols.symbol(&func_name), name_pos);
         eat!(self, OpenParen);
         let params = self.fields(CloseParen)?;
         eat!(self, CloseParen, ")");
@@ -628,7 +628,7 @@ impl<'a, R: Read> Parser<'a, R> {
 
         // FIXME: not sure it's a good idea to do the transformations in the parser itself, because
         // the semantic analyzer could report errors in this generated code.
-        let name = self.symbols.unnamed();
+        let name = WithPos::new(self.symbols.unnamed(), pos);
         let mut sequence = vec![
             WithPos::new(Expr::Decl(Box::new(WithPos::new(
                 Declaration::Variable {
@@ -638,7 +638,7 @@ impl<'a, R: Read> Parser<'a, R> {
                             fields: fields.clone(), // TODO: remove this clone.
                             typ,
                         }, pos),
-                    name,
+                    name: name.clone(),
                     typ: None,
                 },
                 pos))
@@ -650,12 +650,12 @@ impl<'a, R: Read> Parser<'a, R> {
                 var:
                     WithPos::new(Var::Field {
                         ident: WithPos::new(field.node.ident, field.pos),
-                        this: Box::new(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)),
+                        this: Box::new(WithPos::new(Var::Simple { ident: name.clone() }, pos)),
                     }, pos)
             }, pos));
         }
 
-        sequence.push(WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: WithPos::new(name, pos) }, pos)), pos));
+        sequence.push(WithPos::new(Expr::Variable(WithPos::new(Var::Simple { ident: name }, pos)), pos));
         Ok(WithPos::new(Expr::Sequence(sequence), pos))
     }
 
@@ -792,9 +792,9 @@ impl<'a, R: Read> Parser<'a, R> {
     fn var_dec(&mut self, scope: Scope) -> Result<DeclarationWithPos> {
         let pos = eat!(self, Var);
         let var_name;
-        eat!(self, Ident, var_name);
+        let name_pos = eat!(self, Ident, var_name);
         let typ = self.optional_type()?;
-        let name = self.symbols.symbol(&var_name);
+        let name = WithPos::new(self.symbols.symbol(&var_name), name_pos);
         eat!(self, Equal);
         let init = self.expr()?;
         match scope {
@@ -894,7 +894,7 @@ fn for_loop(symbols: &mut Symbols<()>, var: Symbol, body: ExprWithPos, var_pos: 
     let iter_variable = WithPos::new(Var::Simple { ident: WithPos::new(var, var_pos) }, var_pos);
     let iter_variable_expr = WithPos::new(Expr::Variable(iter_variable.clone()), var_pos);
 
-    let start_symbol = var;
+    let start_symbol = WithPos::new(var, var_pos);
     let end_symbol = symbols.unnamed();
     let body =
         Expr::If {
@@ -946,7 +946,7 @@ fn for_loop(symbols: &mut Symbols<()>, var: Symbol, body: ExprWithPos, var_pos: 
             Box::new(WithPos::dummy(Variable {
                 escape: false,
                 init: end,
-                name: end_symbol,
+                name: WithPos::new(end_symbol, var_pos),
                 typ: None,
             }))
         )),

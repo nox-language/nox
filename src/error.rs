@@ -45,12 +45,9 @@ pub enum Error {
     Cycle {
         pos: Pos,
     },
-    DuplicateParam {
+    Duplicate {
         ident: String,
-        pos: Pos,
-    },
-    DuplicateType {
-        ident: String,
+        item: &'static str,
         pos: Pos,
     },
     Eof,
@@ -75,6 +72,7 @@ pub enum Error {
     },
     Msg(String),
     Multi(Vec<Error>),
+    NoMainFunction(Pos),
     NotAStruct {
         pos: Pos,
         typ: String,
@@ -139,12 +137,8 @@ impl Error {
                 eprintln!("Type cycle detected:{}", terminal.end_bold());
                 pos.show(symbols, terminal);
             },
-            DuplicateParam { ref ident, pos } => {
-                eprintln!("Duplicate parameter name `{}`{}", ident, terminal.end_bold());
-                pos.show(symbols, terminal);
-            },
-            DuplicateType { ref ident, pos } => {
-                eprintln!("Duplicate type name `{}`{}", ident, terminal.end_bold());
+            Duplicate { ref ident, item, pos } => {
+                eprintln!("Duplicate {} `{}`{}", item, ident, terminal.end_bold());
                 pos.show(symbols, terminal);
                 highlight_line(pos, symbols, terminal, None)?;
             },
@@ -168,6 +162,10 @@ impl Error {
             },
             Msg(ref string) => eprintln!("{}", string),
             Multi(_) => unreachable!(),
+            NoMainFunction(pos) => {
+                eprintln!("Main function not found{}", terminal.end_bold());
+                pos.show(symbols, terminal);
+            },
             NotAStruct { pos, ref typ } => {
                 eprintln!("Type `{}` is not a struct type{}", typ, terminal.end_bold());
                 pos.show(symbols, terminal);
