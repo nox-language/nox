@@ -246,6 +246,17 @@ impl<R: Read> Lexer<R> {
         })
     }
 
+    fn singleline_comment(&mut self) -> Result<()> {
+        loop {
+            self.advance()?;
+            if self.current_char()? == '\n' {
+                self.advance()?;
+                break;
+            }
+        }
+        Ok(())
+    }
+
     fn skip_until_slash(&mut self) -> Result<()> {
         loop {
             let ch = self.current_char()?;
@@ -276,6 +287,10 @@ impl<R: Read> Lexer<R> {
                 Err(error) => return Err(error),
                 _ => (),
             }
+            self.token()
+        }
+        else if self.current_char()? == '/' {
+            self.singleline_comment()?;
             self.token()
         }
         else {

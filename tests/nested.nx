@@ -2,11 +2,14 @@ fun f() = (
     var v = 6;
     printi v;
     (
+        // Shadow variable v.
         var v = 7;
         printi v;
     );
+    // Back to outer variable v.
     printi v;
     (
+        // Shadow again variable v.
         var v = 8;
         printi v;
     );
