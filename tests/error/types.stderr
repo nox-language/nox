@@ -1,14 +1,8 @@
-error: Unexpected type int32, expecting bool
-   --> tests/error/types.nx:7:8
-  |
-7 |     if 12 then
-  |        ^^
-
-error: Unexpected type int32, expecting string
-   --> tests/error/types.nx:9:11
-  |
-9 |     print 12;
-  |           ^^
+error: Unexpected type int32, expecting struct Point
+   --> tests/error/types.nx:11:24
+   |
+11 |     var point: Point = 12
+   |                        ^^
 
 error: Unexpected type string, expecting int32
    --> tests/error/types.nx:10:12
@@ -16,9 +10,15 @@ error: Unexpected type string, expecting int32
 10 |     printi "hello";
    |            ^^^^^^^
 
-error: Unexpected type int32, expecting struct Point
-   --> tests/error/types.nx:11:24
-   |
-11 |     var point: Point = 12
-   |                        ^^
+error: Unexpected type int32, expecting string
+   --> tests/error/types.nx:9:11
+  |
+9 |     print 12;
+  |           ^^
+
+error: Unexpected type int32, expecting bool
+   --> tests/error/types.nx:7:8
+  |
+7 |     if 12 then
+  |        ^^
 

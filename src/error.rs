@@ -118,7 +118,7 @@ pub enum Error {
 impl Error {
     pub fn show(&self, symbols: &Symbols<()>, terminal: &Terminal) -> io::Result<()> {
         if let Multi(ref errors) = *self {
-            for error in errors {
+            for error in errors.iter().rev() {
                 error.show(symbols, terminal)?;
             }
             return Ok(());

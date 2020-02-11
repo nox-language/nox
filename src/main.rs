@@ -22,7 +22,6 @@
 /*
  * TODO: rename int and int32 to i32.
  * TODO: function parameters without parentheses.
- * TODO: show errors in reverse order.
  * TODO: highlight multiple lines in error message.
  * FIXME: do not show type errors with invalid types.
  * FIXME: do not show type errors for undefined variable.
