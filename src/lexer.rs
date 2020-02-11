@@ -280,10 +280,14 @@ impl<R: Read> Lexer<R> {
         self.advance()?;
         if self.current_char()? == '*' {
             match self.comment() {
-                Err(Eof) => return Err(Unclosed {
-                    pos: self.saved_pos,
-                    token: "comment",
-                }),
+                Err(Eof) => {
+                    let mut pos = self.saved_pos;
+                    pos.length = 2;
+                    return Err(Unclosed {
+                        pos,
+                        token: "comment",
+                    })
+                },
                 Err(error) => return Err(error),
                 _ => (),
             }
@@ -299,7 +303,7 @@ impl<R: Read> Lexer<R> {
     }
 
     fn string(&mut self) -> Result<Token> {
-        let result = {
+        let result = (|| {
             self.save_start();
             let mut string = String::new();
             let start = self.current_pos().byte;
@@ -326,12 +330,16 @@ impl<R: Read> Lexer<R> {
             self.eat('"')?;
             let len = self.current_pos().byte - start;
             self.make_token(Str(string), len as usize)
-        };
+        })();
         match result {
-            Err(Eof) => Err(Unclosed {
-                pos: self.saved_pos,
-                token: "string",
-            }),
+            Err(Eof) => {
+                let mut pos = self.saved_pos;
+                pos.length = 1;
+                Err(Unclosed {
+                    pos,
+                    token: "string",
+                })
+            },
             _ => result,
         }
     }

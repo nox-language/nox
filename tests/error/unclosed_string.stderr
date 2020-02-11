@@ -1,0 +1,6 @@
+error: Unclosed string
+   --> tests/error/unclosed_string.nx:3:11
+  |
+3 |     print(")
+  |           ^
+

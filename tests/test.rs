@@ -83,6 +83,8 @@ fn test_errors() {
         "multiple_main",
         "no_main",
         "types",
+        "unclosed_comment",
+        "unclosed_string",
     ];
 
     for file in &files {

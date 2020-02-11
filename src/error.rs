@@ -181,8 +181,9 @@ impl Error {
                 highlight_line(pos, symbols, terminal, None)?;
             },
             Unclosed { pos, token } => {
-                eprintln!("Unclosed {} starting{}", token, terminal.end_bold());
+                eprintln!("Unclosed {}{}", token, terminal.end_bold());
                 pos.show(symbols, terminal);
+                highlight_line(pos, symbols, terminal, None)?;
             },
             Undefined { ref help, ref ident, ref item, pos } => {
                 eprintln!("Undefined {} `{}`{}", item, ident, terminal.end_bold());

@@ -1,0 +1,6 @@
+error: Unclosed comment
+   --> tests/error/unclosed_comment.nx:3:3
+  |
+3 |   /*
+  |   ^^
+
