@@ -19,10 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::fmt::{self, Display, Formatter};
-
 use self::Type::*;
-use symbol::{Symbol, SymbolWithPos};
+use symbol::{Symbol, Symbols, SymbolWithPos};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
@@ -38,38 +36,24 @@ pub enum Type {
     Error,
 }
 
-impl Display for Type {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        let string =
-            match *self {
-                Array(ref typ, size) => {
-                    write!(formatter, "[{}; {}]", typ, size)?;
-                    return Ok(());
-                },
-                Bool => "bool".to_string(),
-                Int32 => "int32".to_string(),
-                Name(_, ref typ) => {
-                    typ.fmt(formatter)?;
-                    return Ok(());
-                },
-                Nil => "nil".to_string(),
-                String => "string".to_string(),
-                Struct(_, ref types, _) => {
-                    write!(formatter, "{{")?;
-                    if let Some((last_type, types)) = types.split_last() {
-                        for &(_, ref typ) in types {
-                            typ.fmt(formatter)?;
-                            write!(formatter, ", ")?;
-                        }
-                        last_type.1.fmt(formatter)?;
-                    }
-                    "}".to_string()
-                },
-                Unit => "()".to_string(),
-                Void => "void".to_string(),
-                Error => "type error".to_string(),
-            };
-        write!(formatter, "{}", string)
+impl Type {
+    pub fn show(&self, symbols: &Symbols<()>) -> std::string::String {
+        match *self {
+            Array(ref typ, size) => {
+                format!("[{}; {}]", typ.show(symbols), size)
+            },
+            Bool => "bool".to_string(),
+            Int32 => "int32".to_string(),
+            Name(_, ref typ) => {
+                typ.show(symbols)
+            },
+            Nil => "nil".to_string(),
+            String => "string".to_string(),
+            Struct(symbol, _, _) => format!("struct {}", symbols.name(symbol)),
+            Unit => "()".to_string(),
+            Void => "void".to_string(),
+            Error => "type error".to_string(),
+        }
     }
 }
 

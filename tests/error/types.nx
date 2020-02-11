@@ -1,6 +1,12 @@
+struct Point {
+    x: int,
+    y: int,
+}
+
 fun main() = (
     if 12 then
         print "Hello\n";
     print 12;
     printi "hello";
+    var point: Point = 12
 )

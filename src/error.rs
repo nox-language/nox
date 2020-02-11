@@ -40,7 +40,7 @@ pub enum Error {
     },
     CannotIndex {
         pos: Pos,
-        typ: String,
+        typ: Type,
     },
     Cycle {
         pos: Pos,
@@ -75,7 +75,7 @@ pub enum Error {
     NoMainFunction(Pos),
     NotAStruct {
         pos: Pos,
-        typ: String,
+        typ: Type,
     },
     StructType {
         pos: Pos,
@@ -130,7 +130,7 @@ impl Error {
                 pos.show(symbols, terminal);
             },
             CannotIndex { pos, ref typ } => {
-                eprintln!("Cannot index value of type `{}`{}", typ, terminal.end_bold());
+                eprintln!("Cannot index value of type `{}`{}", typ.show(symbols), terminal.end_bold());
                 pos.show(symbols, terminal)
             },
             Cycle { pos } => {
@@ -167,7 +167,7 @@ impl Error {
                 pos.show(symbols, terminal);
             },
             NotAStruct { pos, ref typ } => {
-                eprintln!("Type `{}` is not a struct type{}", typ, terminal.end_bold());
+                eprintln!("Type `{}` is not a struct type{}", typ.show(symbols), terminal.end_bold());
                 pos.show(symbols, terminal);
                 highlight_line(pos, symbols, terminal, None)?;
             },
@@ -176,7 +176,7 @@ impl Error {
                 pos.show(symbols, terminal);
             },
             Error::Type { ref expected, pos, ref unexpected } => {
-                eprintln!("Unexpected type {}, expecting {}{}", unexpected, expected, terminal.end_bold());
+                eprintln!("Unexpected type {}, expecting {}{}", unexpected.show(symbols), expected.show(symbols), terminal.end_bold());
                 pos.show(symbols, terminal);
                 highlight_line(pos, symbols, terminal, None)?;
             },

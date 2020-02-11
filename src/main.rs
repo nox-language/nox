@@ -24,7 +24,6 @@
  * TODO: function parameters without parentheses.
  * TODO: show errors in reverse order.
  * TODO: highlight multiple lines in error message.
- * TODO: show the struct name instead of its structure in error messages.
  * FIXME: do not show type errors with invalid types.
  * FIXME: do not show type errors for undefined variable.
  * FIXME: global array does not compile.

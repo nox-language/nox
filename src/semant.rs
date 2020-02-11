@@ -670,7 +670,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     typ =>
                         return self.add_error_or(Error::NotAStruct {
                             pos: this.pos,
-                            typ: typ.to_string(),
+                            typ,
                         }, var_type_error()),
                 }
             },
@@ -708,7 +708,7 @@ impl<'a> SemanticAnalyzer<'a> {
                     typ =>
                         self.add_error_or(Error::CannotIndex {
                             pos: var.pos,
-                            typ: typ.to_string(),
+                            typ,
                         }, var_type_error()),
                 }
             },
