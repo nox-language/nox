@@ -21,13 +21,13 @@
 
 /*
  * TODO: rename int and int32 to i32.
- * TODO: function parameters without parentheses.
+ * FIXME: function call without parentheses (it works because global variables are functions).
  * TODO: highlight multiple lines in error message.
  * FIXME: do not show type errors with invalid types.
  * FIXME: do not show type errors for undefined variable.
  * FIXME: global array does not compile.
  * TODO: error when having a variable named main.
- * TODO: call exit in main (that requires writing an alternative runtime, why?).
+ * TODO: call exit in main (that requires writing an alternative runtime, because nox currently use the gcc runtime).
  */
 
 #![allow(unknown_lints)]
