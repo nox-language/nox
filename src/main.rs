@@ -20,12 +20,13 @@
  */
 
 /*
+ * FIXME: global array does not compile (change global variables from functions to (un)initialized
+ * data with the assignment done at the beginning of the main function).
  * TODO: rename int and int32 to i32.
  * FIXME: function call without parentheses (it works because global variables are functions).
  * TODO: highlight multiple lines in error message.
  * FIXME: do not show type errors with invalid types.
  * FIXME: do not show type errors for undefined variable.
- * FIXME: global array does not compile.
  * TODO: error when having a variable named main.
  * TODO: call exit in main (that requires writing an alternative runtime, because nox currently use the gcc runtime).
  */
