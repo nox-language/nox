@@ -2,6 +2,22 @@
 
 == Goal/values
 
+To evaluate whether a language feature or standard library API should be included in the language, we have a list of
+goals and values for the language.
+
+ * Memory and thread safety without compromising performance are the most important goal.
+ ** Unlike Rust, Nox doesn't want to provide other type of safety like cryptographic hash to prevent DDoS or Unicode
+ validation by default.
+ * Performance is also the most important goal.
+ * The language should be as simple as it possibly can given the above goals.
+ ** Simplicity doesn't mean it's easy for the user in the sense that the language won't add convenience or ergonomic
+ features to make it more beginner-friendly.
+ ** Simplicity means that Nox will support the minimum features required to achieve its goals, nothing more.
+ ** To decide whether to add a feature in the language or the standard library, answer the following question:
+ *** How often will this be used?
+
+Make a second repo that will evaluate features considered for the language.
+
 == Thread Safety
 
 thread_spawn(value: T)
@@ -32,6 +48,11 @@ fn thread_spawn(callback: fn())
 == Inspirations
 
 Essayer le langage Whiley.
+
+== Avoiding complexity
+
+Instead of type classes, start with implementing the stuff like Hash in the language itself.
+If not powerful enough, think about other solutions like having OCaml-like modules: since they're complicated, people might be less likely to abuse them (though would it be problematic that the people that do understand them abuse them? Maybe check if that has happened in OCaml).
 
 == Memory Safety
 
@@ -80,6 +101,20 @@ fun test
         x
     )
 
+=== Allocation failure
+
+Open question: what to do to support allocation failure without having something that will infect all the code?
+
+=== Checked dynamic arrays
+
+Since we have refinement types, we probably can support safe allocas for dynamic arrays.
+There should probably be an option to tweak the maximum stack size.
+
+Can we also make recursion safe using refinement types by checking that the number of recursive calls fit into the stack size?
+
+Can we use those dynamic arrays to have IO that read into buffers allocated on the stack?
+Can we design an API that will allow boxing those buffers without having 2 different functions?
+
 == User-friendlyness
 
 === Less boilerplate
@@ -97,7 +132,12 @@ Maybe we don't need permissions. It could only be types:
 type &mut T = *T
 ensures is_unique(*T)
 
-Genericity for references to allow unwrap() to either return T or &T.
+Genericity for references to allow unwrap() to either return T or &T and methods like Map.get() to take T or &T.
+
+Overload to allow both hashmap.get(10) and hashmap.get(&String::new())?
+
+Pony arrow arguments to avoid having to write get and get_mut methods?
+Does this happen enough to justify the complexity it adds?
 
 === Freeing memory
 
@@ -111,7 +151,10 @@ Same for i8, i16, i32, i64 if they are greater than or equal to 0.
 
 === Arrays
 
-Allow multiple shared references to the same array if we can prove that the indexes are different?
+Allow multiple mutable references to the same array if we can prove that the indexes are different?
+
+Provide struct inheritence (without polymorphism) to have a Vec type which inherits from Array, allowing us to use
+a Vec when an array is required?
 
 === Lifetimes
 
@@ -120,6 +163,18 @@ let vector_get(&vector, &useless): &a
 ?
 If it's implicit, it means the compiler needs to do a whole program analysis before being able to infer the lifetimes here.
 Isn't it what the type inference do anyway?
+
+=== Safe transmute
+
+That might be useful to transmute a number/struct to an array of bytes, for instance to change the endianness.
+Make sure there's no UB. Look at Rust ideas for this.
+
+== Performance.
+
+How to do zero-cost error handling?
+Result requires to check for the error even when there are no errors.
+Is there a way to do something like exceptions where there are no costs when there are no errors?
+One idea would be to optimize the case when there's no need to unwind (i.e. no variables to free via defer), but I don't like the idea that it doesn't always work.
 
 == Strings
 
@@ -131,6 +186,10 @@ Syntax genre int*l ptr pour les lifetimes? Regarder la syntax des noms de lock d
 
 Déréférencement de pointeur en suffixe genre ptr*.field avec probablement un autre caractère que * pour ne pas confondre avec la multiplication (pas sûr que ce soit possible si on a la surcharge d’opérateur, donc peut-être ptr.*.field comme Zig).
 
+Lazy argument to allow function call like `debug_log expensive_call`?
+Not sure I like this, but it seems simpler than having macros.
+That could also be used to avoid having 2 methods: `unwrap_or()` and `unwrap_or_else()`: we could only have `unwrap_or()` that takes a lazy argument.
+
 == Standard library
 
 writev for atomic printf?
@@ -139,8 +198,18 @@ writev for atomic printf?
 
 Read this article: https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527
 
+Force semantic versioning?
+How would that work if the ABI breaks by a language update?
+
+== Potential issues
+
+Self-referencial structs (solution is unmovable types? maybe with a marker?).
+Intrusive lists: https://gist.github.com/Darksonn/1567538f56af1a8038ecc3c664a42462
+Pattern matching smart pointer types.
+
 == No-go
 
 No implicit variant for enum.
-RAII (but that seems useful for Rc)
-Partial function application
+RAII (but that seems useful for Rc) (the idea is to handle errors for Drop)
+Partial function application.
+Any type of macros.
