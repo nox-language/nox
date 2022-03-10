@@ -1,23 +1,5 @@
 = Refinement type for memory and thread safety
 
-== Goal/values
-
-To evaluate whether a language feature or standard library API should be included in the language, we have a list of
-goals and values for the language.
-
- * Memory and thread safety without compromising performance are the most important goal.
- ** Unlike Rust, Nox doesn't want to provide other type of safety like cryptographic hash to prevent DDoS or Unicode
- validation by default.
- * Performance is also the most important goal.
- * The language should be as simple as it possibly can given the above goals.
- ** Simplicity doesn't mean it's easy for the user in the sense that the language won't add convenience or ergonomic
- features to make it more beginner-friendly.
- ** Simplicity means that Nox will support the minimum features required to achieve its goals, nothing more.
- ** To decide whether to add a feature in the language or the standard library, answer the following question:
- *** How often will this be used?
-
-Make a second repo that will evaluate features considered for the language.
-
 == Thread Safety
 
 thread_spawn(value: T)
