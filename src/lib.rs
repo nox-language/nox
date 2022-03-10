@@ -30,6 +30,11 @@
                       -lgcc_s --no-as-needed /usr/lib/crtn.o
  */
 
+/*
+ * TODO: For a predicate like is_some(), the compiler will find what's the mapping between the enum
+ * tag and the return value.
+ */
+
 use std::ffi::{CStr, CString};
 //use std::process;
 use std::io::{Read, Write, stdin, stdout};
