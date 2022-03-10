@@ -2,16 +2,22 @@
 
 == Thread Safety
 
+----
 thread_spawn(value: T)
     ensure is_unique(T)
+----
 
 give lifetime to thread (to share references between threads)?
 
 Think about sharing data between threads:
 maybe allow the programmer to specify that a value is shareable:
 
+[source,ocaml]
+----
 let spin_lock(): SpinLock
     assume is_shareable(result)
+----
+
 Markers are probably better for that? Does the compiler need to know the concept of shareability?
 
 Safe atomics: https://readthedocs.org/projects/ats-documentation/downloads/pdf/latest/
@@ -20,16 +26,19 @@ Safe atomics: https://readthedocs.org/projects/ats-documentation/downloads/pdf/l
 
 Markers are a way to say what a type is.
 
+[source,ocaml]
+----
 mark Send
 
 assume(i32.is(Send))
 
 fn thread_spawn(callback: fn())
     ensure callback.is(Send)
+----
 
 == Inspirations
 
-Essayer le langage Whiley.
+Try the programming language Whiley.
 
 Try to make better than Rust.
 Some Rust pitfalls:
@@ -46,10 +55,13 @@ If not powerful enough, think about other solutions like having OCaml-like modul
 
 === No dangling reference
 
+[source,ocaml]
+----
 let vector_get(&vector): &a
 
 let vector_push(&vector, a)
     ensure is_unique(&vector)
+----
 
 Can we generalize this to allow multiple mutable references on the vector?
 
@@ -60,17 +72,20 @@ Cannot move non-static reference to move function.
 
 For ensuring memory deallocation, have post-condition like:
 
+[source,ocaml]
+----
 let malloc(): ptr
     ensure result == 0 || will_call(free(result))
 This seems complicated. Think about something else inspired by linear types, maybe:
 let malloc(): ptr
     ensure result == 0 || will_consume(result)
+----
 
 === No access to uninitialized values
 
-Think about uninitialized values (from malloc).
-No implicit free to avoid freeing uninitialized memory. Why? You meant to avoid double-free?
-Functions to work with uninitialized memory.
+ * Think about uninitialized values (from malloc).
+ * No implicit free to avoid freeing uninitialized memory. Why? You meant to avoid double-free?
+ * Functions to work with uninitialized memory.
 
 === Pointer
 
@@ -81,6 +96,8 @@ to have unique pointers?
 
 For inline assembly, the same system with assumption seems to work:
 
+[source,ocaml]
+----
 fun test
     assume is_initialized(x) && x > 0
     = (
@@ -88,6 +105,7 @@ fun test
         inline asm …;
         x
     )
+----
 
 === Allocation failure
 
@@ -103,48 +121,57 @@ Summary:
 
 We probably want a different version of the second point, using refinement types like:
 
+[source,ocaml]
+----
 static vec.push(10)
+----
 
 will require that the len < capacity in the static case.
 
 Perhaps the static keyword is not even necessary and we can actually use a generic type like:
 
+[source,ocaml]
+----
 struct NotStatic
 struct Static
 fun push<T, S = NotStatic>(&self, value: T) ensure S != Static || self.len < self.capacity
 vec.push<Static>(10)
+----
 
 But this would require the ability to compare types in pre-conditions.
 
 We can probably even put a similar generic type on the Vec itself:
 
+[source,ocaml]
+----
 struct Vec<T, O = NotStatic>
 
 fun push<T, S = NotStatic>(&self, value: T) ensure S != Static || O != Static || self.len < self.capacity
+----
 
 to not have to specify it at every call.
 
-We probably allow want to compare some annotated types from libstd in the pre-conditions.
+We probably only want to compare some annotated types from libstd in the pre-conditions.
 
 Or perhaps we want to make this a config for the project (that seems like a bad idea, because that would forbid you to use some libraries).
 
 === Checked dynamic arrays
 
-Since we have refinement types, we probably can support safe allocas for dynamic arrays.
-There should probably be an option to tweak the maximum stack size.
+ * Since we have refinement types, we probably can support safe allocas for dynamic arrays.
+ * There should probably be an option to tweak the maximum stack size.
 
 Can we also make recursion safe using refinement types by checking that the number of recursive calls fit into the stack size?
 
-Can we use those dynamic arrays to have IO that read into buffers allocated on the stack?
-Can we design an API that will allow boxing those buffers without having 2 different functions?
+ * Can we use those dynamic arrays to have IO that read into buffers allocated on the stack?
+ * Can we design an API that will allow boxing those buffers without having 2 different functions?
 
 == Other types of safety
 
 Having integer casts that work without truncation/wrapping, i.e. use refinement types to make sure the cast is always safe.
 
-The user can write his own predicate that can be used in pre-conditions.
-Those function require an attribute #[predicate]:
-a predicate is limited in that it cannot call other functions.
+ * The user can write his own predicate that can be used in pre-conditions.
+ * Those function require an attribute `#[predicate]`:
+ * a predicate is limited in that it cannot call other functions.
 
 == User-friendliness
 
@@ -152,34 +179,41 @@ a predicate is limited in that it cannot call other functions.
 
 Permissions are an alias for a precondition.
 
+[source,ocaml]
+----
 perm mut(type) = is_unique(type)
 
 let vec_push(&mut self, element: T) // mut is the permission defined earlier.
+----
 
 Maybe we don't need permissions. It could only be types:
 
+[source,ocaml]
+----
 &mut could be a generic type
 
 type &mut T = *T
 ensures is_unique(*T)
+----
 
 Probably only libstd should be allowed to use special characters in types.
 
-! as an operator for unwrap() since unwrap is always safe.
+`!` as an operator for `unwrap()` since unwrap is always safe.
 
-Genericity for references to allow unwrap() to either return T or &T and methods like Map.get() to take T or &T.
+Genericity for references to allow `unwrap()` to either return T or &T and methods like `Map.get()` to take T or &T.
 Is this something we really want? Doesn't that make the compiler more complex? Is this something used often?
 
-Overload to allow both hashmap.get(10) and hashmap.get(&String::new())?
-Is this something we really want? Doesn't that make the compiler more complex? Is this something used often?
-
-Pony arrow arguments to avoid having to write get and get_mut methods?
+Pony arrow arguments to avoid having to write `get` and `get_mut` methods?
 Does this happen enough to justify the complexity it adds?
 
 === Freeing memory
 
 To free memory at the end of a function:
+
+[source,ocaml]
+----
 defer free()
+----
 
 === Indexing
 
@@ -196,7 +230,12 @@ a Vec when an array is required?
 === Lifetimes
 
 Is the concept of lifetimes implicit or explicit in
+
+[source,ocaml]
+----
 let vector_get(&vector, &useless): &a
+----
+
 ?
 If it's implicit, it means the compiler needs to do a whole program analysis before being able to infer the lifetimes here.
 Isn't it what the type inference do anyway?
@@ -204,9 +243,9 @@ Or we can do lifetime elisions like in Rust.
 
 === Safe transmute
 
-That might be useful to transmute a number/struct to an array of bytes, for instance to change the endianness.
-Make sure there's no UB. Look at Rust ideas for this.
-Do we actually want this? It looks like it won't be used often.
+ * That might be useful to transmute a number/struct to an array of bytes, for instance to change the endianness.
+ ** Make sure there's no UB. Look at Rust ideas for this.
+ ** Do we actually want this? It looks like it won't be used often.
 
 === Error handling
 
@@ -217,17 +256,18 @@ It seems there's a limited set of actions you would take to handle errors.
  * Others can happen normally, but requires an action (EWOULDBLOCK).
 
 It seems however we cannot decide the action at the definition of the error because this is application-specific.
-Should an application error handler be used?
-If so, it seems like this wouldn't be sufficient as some errors require local handling instead of global.
+
+ * Should an application error handler be used?
+ * If so, it seems like this wouldn't be sufficient as some errors require local handling instead of global.
 
 == Performance.
 
 === How to do zero-cost error handling?
 
-Result requires to check for the error even when there are no errors.
-Is there a way to do something like exceptions where there are no costs when there are no errors?
-One idea would be to optimize the case when there's no need to unwind (i.e. no variables to free via defer), but I don't like the idea that it doesn't always work.
-That seems unnecessary because exceptions for error-handling optimization is only useful for recursive algorithms: we can just write it iteratively.
+ * Result requires to check for the error even when there are no errors.
+ * Is there a way to do something like exceptions where there are no costs when there are no errors?
+ * One idea would be to optimize the case when there's no need to unwind (i.e. no variables to free via defer), but I don't like the idea that it doesn't always work.
+ * That seems unnecessary because exceptions for error-handling optimization is only useful for recursive algorithms: we can just write it iteratively.
 
 Look at what Zig does.
 
@@ -242,24 +282,23 @@ fun myFunc() =
 
 == Strings
 
-Use latin1?
-No, I believe we can use Unicode and not pay for the unicode validation thanks to refinement types.
+ * Use latin1?
+ ** No, I believe we can use Unicode and not pay for the unicode validation thanks to refinement types.
 
-The idea would be that methods requiring a valid unicode string would have a pre-condition is_unicode_valid(self) and
+ * The idea would be that methods requiring a valid unicode string would have a pre-condition is_unicode_valid(self) and
 that would require a call to validate_unicode(string) before calling those methods.
-That might require some form of dependent types here to store whether the string was validated or not.
-Perhaps some types could be compile-time types?
-Think about how to make this more user-friendly. Perhaps with a good API like String::check_from(bytes).
+ * That might require some form of dependent types here to store whether the string was validated or not.
+ ** Perhaps some types could be compile-time types?
+ * Think about how to make this more user-friendly. Perhaps with a good API like String::check_from(bytes).
 
 == Syntax
 
-Syntax genre int*l ptr pour les lifetimes? Regarder la syntax des noms de lock de Cyclone.
-
-Déréférencement de pointeur en suffixe genre ptr*.field avec probablement un autre caractère que * pour ne pas confondre avec la multiplication (pas sûr que ce soit possible si on a la surcharge d’opérateur, donc peut-être ptr.*.field comme Zig).
-
-Lazy argument to allow function call like `debug_log expensive_call`?
-Not sure I like this, but it seems simpler than having macros.
-That could also be used to avoid having 2 methods: `unwrap_or()` and `unwrap_or_else()`: we could only have `unwrap_or()` that takes a lazy argument.
+ * Syntax like `int*l` ptr for lifetimes? Look at lock names syntax in Cyclone.
+ * Dereferencing pointers using a suffix operator like `ptr*.field` with possibly another character than `*` to not have
+ambiguity with multiplication (not sure it's possible if we allow operator overloading, so maybe `ptr.*.field` like Zig).
+ * Lazy argument to allow function call like `debug_log expensive_call`?
+ ** Not sure I like this, but it seems simpler than having macros.
+ * That could also be used to avoid having 2 methods: `unwrap_or()` and `unwrap_or_else()`: we could only have `unwrap_or()` that takes a lazy argument.
 
 == Standard library
 
@@ -267,9 +306,8 @@ writev for atomic printf?
 
 === Iterators
 
-I'd like to avoid having iterators, but that seems necessary for types like HashMap.
-
-Look at what Go is doing for this.
+ * I'd like to avoid having iterators, but that seems necessary for types like HashMap.
+ * Look at what Go is doing for this.
 
 == Package manager (lumos)
 
@@ -277,8 +315,7 @@ Read this article: https://medium.com/@sdboyer/so-you-want-to-write-a-package-ma
 
 === Force semantic versioning?
 
-How would that work if the ABI breaks by a language update?
-=> Is this really an issue since all the code would be recompiled anyway?
+One caveat of this issue is that adding a new dependency can change the version of an existing transitive dependency.
 
 I think this idea would work if we add the rule that updating a major version of a dependency requires you to bump
 the major version of your library.
@@ -289,31 +326,44 @@ I would prefer to avoid it, but not sure how.
 I don't like the approach of Haskell either.
 
 === Zig approach allows users the choose whether they want to allow multiple versions of dependencies or not:
+
 https://github.com/ziglang/zig/issues/943#issuecomment-386458021
 
 === Elixir approach might be interesting (disallow multiple versions of dependencies):
+
 https://github.com/ziglang/zig/issues/943#issuecomment-878305090
+
 Seems like people had dependency hell in Elixir and I'm not sure how this is different than Haskell.
 
 === Thoughts from Elm:
+
 https://github.com/elm/compiler/issues/1871#issuecomment-464122832
+
 Seems like they actually allow multiple versions of libraries:
 https://elm-lang.org/news/package-manager
 
 === Maybe allow the user to use different versions by listing the name of the library and the versions used.
+
 => Seems like the kind of things the users would want to get around by writing another package manager.
 
 Read more about diamond dependency problem.
 
 == Potential issues
 
-Self-referencial structs (solution is unmovable types? maybe with a marker?).
-Intrusive lists: https://gist.github.com/Darksonn/1567538f56af1a8038ecc3c664a42462
-Pattern matching smart pointer types.
+ * Self-referencial structs (solution is unmovable types? maybe with a marker?).
+ * Intrusive lists: https://gist.github.com/Darksonn/1567538f56af1a8038ecc3c664a42462
+ * Pattern matching smart pointer types.
+
+== ABI
+
+ * The ABI should be stable.
+ * Do we want an ABI compatible with C?
+ ** That seems interesting for simplicity (won't have to implement unmangling in many tools like gdb/valgrind/…), but
+ might be limiting (what to do for closures?).
 
 == No-go
 
-No implicit variant for enum.
-RAII (but that seems useful for Rc) (the idea is to handle errors for Drop)
-Partial function application.
-Any type of macros.
+ * No implicit variant for enum.
+ * RAII (but that seems useful for Rc) (the idea is to handle errors for Drop)
+ * Partial function application.
+ * Any type of macros.
