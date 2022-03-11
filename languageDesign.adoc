@@ -1,4 +1,7 @@
-= Refinement type for memory and thread safety
+= Nox Language Design
+
+Nox uses pre- and post-conditions checked at compile-time to guarantee
+memory and thread safety.
 
 == Thread Safety
 
@@ -119,7 +122,7 @@ Summary:
  * Depending on whether the pointer type is nullable or not, panic (not nullable pointer) or return NULL (nullable pointer).
  * Provide a keyword "static" on functions like append to mention that this will never alloc.
 
-We probably want a different version of the second point, using refinement types like:
+We probably want a different version of the second point, using a pre-condition like:
 
 [source,ocaml]
 ----
@@ -157,17 +160,17 @@ Or perhaps we want to make this a config for the project (that seems like a bad 
 
 === Checked dynamic arrays
 
- * Since we have refinement types, we probably can support safe allocas for dynamic arrays.
+ * Since we have pre-conditions, we probably can support safe allocas for dynamic arrays.
  * There should probably be an option to tweak the maximum stack size.
 
-Can we also make recursion safe using refinement types by checking that the number of recursive calls fit into the stack size?
+Can we also make recursion safe using pre-conditions by checking that the number of recursive calls fit into the stack size?
 
  * Can we use those dynamic arrays to have IO that read into buffers allocated on the stack?
  * Can we design an API that will allow boxing those buffers without having 2 different functions?
 
 == Other types of safety
 
-Having integer casts that work without truncation/wrapping, i.e. use refinement types to make sure the cast is always safe.
+Having integer casts that work without truncation/wrapping, i.e. use pre-conditions to make sure the cast is always safe.
 
  * The user can write his own predicate that can be used in pre-conditions.
  * Those function require an attribute `#[predicate]`:
@@ -283,7 +286,7 @@ fun myFunc() =
 == Strings
 
  * Use latin1?
- ** No, I believe we can use Unicode and not pay for the unicode validation thanks to refinement types.
+ ** No, I believe we can use Unicode and not pay for the unicode validation thanks to pre-conditions.
 
  * The idea would be that methods requiring a valid unicode string would have a pre-condition is_unicode_valid(self) and
 that would require a call to validate_unicode(string) before calling those methods.
