@@ -363,6 +363,10 @@ Read more about diamond dependency problem.
  * Do we want an ABI compatible with C?
  ** That seems interesting for simplicity (won't have to implement unmangling in many tools like gdb/valgrind/…), but
  might be limiting (what to do for closures?).
+ ** An idea to support module would be to forbid underscores in identifiers to have the mangling
+ `library_module_function` that is compatible with C.
+ ** We could even abuse this system for expressing extern C functions.
+ *** Is this a good idea, though?
 
 == No-go
 
