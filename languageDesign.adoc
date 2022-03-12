@@ -319,9 +319,13 @@ Read this article: https://medium.com/@sdboyer/so-you-want-to-write-a-package-ma
 === Force semantic versioning?
 
 One caveat of this issue is that adding a new dependency can change the version of an existing transitive dependency.
+Perhaps we can ask the user if he's OK with the version update (or at least warn him)?
 
-I think this idea would work if we add the rule that updating a major version of a dependency requires you to bump
+ * I think this idea would work if we add the rule that updating a major version of a dependency requires you to bump
 the major version of your library.
+ * This also means that adding a new dependency is a major breaking change.
+ * Maybe doing like Rust would prevent version numbers to go high quickly: having versions 0.x.y to behave differently
+ than >= 1.0.0, i.e. a change of x is a major breaking change.
 
 === Allow different versions of the same library?
 
@@ -367,6 +371,7 @@ Read more about diamond dependency problem.
  `library_module_function` that is compatible with C.
  ** We could even abuse this system for expressing extern C functions.
  *** Is this a good idea, though?
+ ** What about generics?
 
 == No-go
 
