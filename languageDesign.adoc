@@ -53,7 +53,6 @@ Some Rust pitfalls:
 
  * Instead of type classes, start with implementing the stuff like Hash in the language itself.
  ** I plan to implement this with builtins type constraint like `hash`, `deref`, `deref_mut`, `ord`, …
- * [.line-through]#If not powerful enough, think about other solutions like having OCaml-like modules: since they're complicated, people might be less likely to abuse them (though would it be problematic that the people that do understand them abuse them? Maybe check if that has happened in OCaml).#
 
 == Memory Safety
 
@@ -443,7 +442,7 @@ Read more about diamond dependency problem.
 
  * No implicit variant for enum.
  * RAII (but that seems useful for Rc) (the idea is to handle errors for Drop)
- * Traits.
+ * Traits and OCaml-like modules: I believe those won't be needed thanks to predefined type constraints.
  * Inheritance.
  ** At some point, I thought of using inheritance for allowing to send a Vec to a function taking a slice, but that
     was only as a compiler optimization instead of using Deref. I don't want to add features I don't like for a
