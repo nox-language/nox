@@ -51,8 +51,9 @@ Some Rust pitfalls:
 
 == Avoiding complexity
 
-Instead of type classes, start with implementing the stuff like Hash in the language itself.
-If not powerful enough, think about other solutions like having OCaml-like modules: since they're complicated, people might be less likely to abuse them (though would it be problematic that the people that do understand them abuse them? Maybe check if that has happened in OCaml).
+ * Instead of type classes, start with implementing the stuff like Hash in the language itself.
+ ** I plan to implement this with builtins type constraint like `hash`, `deref`, `deref_mut`, `ord`, …
+ * [.line-through]#If not powerful enough, think about other solutions like having OCaml-like modules: since they're complicated, people might be less likely to abuse them (though would it be problematic that the people that do understand them abuse them? Maybe check if that has happened in OCaml).#
 
 == Memory Safety
 
@@ -79,7 +80,12 @@ For ensuring memory deallocation, have post-condition like:
 ----
 let malloc(): ptr
     ensure result == 0 || will_call(free(result))
+----
+
 This seems complicated. Think about something else inspired by linear types, maybe:
+
+[source,ocaml]
+----
 let malloc(): ptr
     ensure result == 0 || will_consume(result)
 ----
@@ -87,13 +93,20 @@ let malloc(): ptr
 === No access to uninitialized values
 
  * Think about uninitialized values (from malloc).
- * No implicit free to avoid freeing uninitialized memory. Why? You meant to avoid double-free?
+ * What about partial initialization of structs?
+ ** Is this something we want to allow?
+ * No implicit free to avoid freeing uninitialized memory.
  * Functions to work with uninitialized memory.
 
 === Pointer
 
 No ownership for pointers, but ownership for the other types, which would allow creating a struct Unique(pointer)
 to have unique pointers?
+
+ * Read https://gankra.github.io/blah/fix-rust-pointers/ to see if anything could be useful.
+ * Maybe pointer provenance is useful for optimizations, but I don't really want to support weird architectures.
+ ** I believe we might want to forbid usize to pointer casts to help with alias analysis.
+ *** Does that require the API added to rust?
 
 === Inline assembly
 
@@ -120,6 +133,7 @@ https://harelang.org/blog/2021-04-28-oom-strategies/
 Summary:
 
  * Depending on whether the pointer type is nullable or not, panic (not nullable pointer) or return NULL (nullable pointer).
+ ** Seems dangerous. We probably want to make this explicit.
  * Provide a keyword "static" on functions like append to mention that this will never alloc.
 
 We probably want a different version of the second point, using a pre-condition like:
@@ -167,6 +181,7 @@ Can we also make recursion safe using pre-conditions by checking that the number
 
  * Can we use those dynamic arrays to have IO that read into buffers allocated on the stack?
  * Can we design an API that will allow boxing those buffers without having 2 different functions?
+ ** Is this actually useful? Having 2 functions is probably fine.
 
 == Other types of safety
 
@@ -227,8 +242,7 @@ Same for i8, i16, i32, i64 if they are greater than or equal to 0.
 
 Allow multiple mutable references to the same array if we can prove that the indexes are different?
 
-Provide struct inheritence (without polymorphism) to have a Vec type which inherits from Array, allowing us to use
-a Vec when an array is required?
+Provide type constraints `deref` and `deref_mut` to allow sending a vec to a function taking a slice.
 
 === Lifetimes
 
@@ -263,6 +277,11 @@ It seems however we cannot decide the action at the definition of the error beca
  * Should an application error handler be used?
  * If so, it seems like this wouldn't be sufficient as some errors require local handling instead of global.
 
+Perhaps just use Option and Result and provide some syntax similar to `let-else` in Rust:
+https://github.com/rust-lang/rfcs/blob/master/text/3137-let-else.md
+
+The error in the Result type must implement Copy?
+
 == Performance.
 
 === How to do zero-cost error handling?
@@ -294,18 +313,55 @@ that would require a call to validate_unicode(string) before calling those metho
  ** Perhaps some types could be compile-time types?
  * Think about how to make this more user-friendly. Perhaps with a good API like String::check_from(bytes).
 
+== Types
+
+ * Limit tuples to pairs (might be a good idea to avoid having functions returning too much unnamed parameters).
+
+== Type system
+
+ * Look at what Zig does instead of trait for generics.
+ ** It doesn't require any annotation: it just gives a good error message.
+ *** This is an interesting idea for functions, but not sure for generic structs.
+ ** It actually use compile-time execution to check the time.
+ * Having type constraints pre-defined in the language for generics like `eq`, `hash`.
+
+== Concurrency
+
+ * Concurrency safety.
+ * Can we have sane defaults for non-threaded programs?
+ ** I.e. Not requiring global variables to be behind a lock?
+ *** That would still require something similar to RefCell.
+
 == Syntax
 
  * Syntax like `int*l` ptr for lifetimes? Look at lock names syntax in Cyclone.
  * Dereferencing pointers using a suffix operator like `ptr*.field` with possibly another character than `*` to not have
 ambiguity with multiplication (not sure it's possible if we allow operator overloading, so maybe `ptr.*.field` like Zig).
+ ** Allow the same operator to be overloaded so that you can get a slice from a Vec.
+ * Get the address of a variable with `variable@`.
  * Lazy argument to allow function call like `debug_log expensive_call`?
  ** Not sure I like this, but it seems simpler than having macros.
  * That could also be used to avoid having 2 methods: `unwrap_or()` and `unwrap_or_else()`: we could only have `unwrap_or()` that takes a lazy argument.
+ * Forbid tabs (for indentations)?
+ * match with end to avoid the issue with nested match?
 
 == Standard library
 
-writev for atomic printf?
+ * writev for atomic printf?
+ * Function unreachable where the compiler checks that it is indeed unreachable.
+ ** Possibly with the pre-condition `false`?
+ ** That would be useful for the `unwrap()` function:
+
+[source,ocaml]
+----
+fun unwrap(self)
+    ensure self.is_some() =
+    match self with
+    | Some value => value
+    | None => unreachable
+----
+
+Or do we allow non-exhaustive match when it's proven that the value is only one variant?
 
 === Iterators
 
@@ -329,27 +385,27 @@ the major version of your library.
 
 === Allow different versions of the same library?
 
-I would prefer to avoid it, but not sure how.
+Forbid having different versions of the same library, using semantic versioning.
 I don't like the approach of Haskell either.
 
-=== Zig approach allows users the choose whether they want to allow multiple versions of dependencies or not:
+==== Zig approach allows users the choose whether they want to allow multiple versions of dependencies or not:
 
 https://github.com/ziglang/zig/issues/943#issuecomment-386458021
 
-=== Elixir approach might be interesting (disallow multiple versions of dependencies):
+==== Elixir approach might be interesting (disallow multiple versions of dependencies):
 
 https://github.com/ziglang/zig/issues/943#issuecomment-878305090
 
 Seems like people had dependency hell in Elixir and I'm not sure how this is different than Haskell.
 
-=== Thoughts from Elm:
+==== Thoughts from Elm:
 
 https://github.com/elm/compiler/issues/1871#issuecomment-464122832
 
 Seems like they actually allow multiple versions of libraries:
 https://elm-lang.org/news/package-manager
 
-=== Maybe allow the user to use different versions by listing the name of the library and the versions used.
+==== Maybe allow the user to use different versions by listing the name of the library and the versions used.
 
 => Seems like the kind of things the users would want to get around by writing another package manager.
 
@@ -360,6 +416,7 @@ Read more about diamond dependency problem.
  * Self-referencial structs (solution is unmovable types? maybe with a marker?).
  * Intrusive lists: https://gist.github.com/Darksonn/1567538f56af1a8038ecc3c664a42462
  * Pattern matching smart pointer types.
+ ** Seems unnecessarily complex, but it should work for normal heap-allocated values.
 
 == ABI
 
@@ -372,10 +429,24 @@ Read more about diamond dependency problem.
  ** We could even abuse this system for expressing extern C functions.
  *** Is this a good idea, though?
  ** What about generics?
+ *** That's probably not an issue:
+ **** The user can manually implement a dynamic version (with enums).
+ **** If necessary, the user can also manually export the generic functions in a library distributed as source files
+ instead of a binary.
+ **** The above can be automated by tools if needed.
+
+== Performance
+
+ * Keep track of compilation speed and binary size compared to C.
 
 == No-go
 
  * No implicit variant for enum.
  * RAII (but that seems useful for Rc) (the idea is to handle errors for Drop)
+ * Traits.
+ * Inheritance.
+ ** At some point, I thought of using inheritance for allowing to send a Vec to a function taking a slice, but that
+    was only as a compiler optimization instead of using Deref. I don't want to add features I don't like for a
+    premature optimization.
  * Partial function application.
  * Any type of macros.
