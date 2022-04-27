@@ -21,23 +21,9 @@ let spin_lock(): SpinLock
     assume is_shareable(result)
 ----
 
-Markers are probably better for that? Does the compiler need to know the concept of shareability?
+Builtin type constraints (`send`, `sync`) are probably better for that? Does the compiler need to know the concept of shareability?
 
 Safe atomics: https://readthedocs.org/projects/ats-documentation/downloads/pdf/latest/
-
-=== Markers
-
-Markers are a way to say what a type is.
-
-[source,ocaml]
-----
-mark Send
-
-assume(i32.is(Send))
-
-fn thread_spawn(callback: fn())
-    ensure callback.is(Send)
-----
 
 == Inspirations
 
@@ -52,7 +38,7 @@ Some Rust pitfalls:
 == Avoiding complexity
 
  * Instead of type classes, start with implementing the stuff like Hash in the language itself.
- ** I plan to implement this with builtins type constraint like `hash`, `deref`, `deref_mut`, `ord`, …
+ ** I plan to implement this with builtin type constraint like `hash`, `send`, `deref`, `deref_mut`, `ord`, …
 
 == Memory Safety
 
@@ -412,7 +398,7 @@ Read more about diamond dependency problem.
 
 == Potential issues
 
- * Self-referencial structs (solution is unmovable types? maybe with a marker?).
+ * Self-referencial structs (solution is unmovable types? maybe with a builtin type constraint?).
  * Intrusive lists: https://gist.github.com/Darksonn/1567538f56af1a8038ecc3c664a42462
  * Pattern matching smart pointer types.
  ** Seems unnecessarily complex, but it should work for normal heap-allocated values.
