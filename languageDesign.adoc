@@ -27,13 +27,12 @@ Safe atomics: https://readthedocs.org/projects/ats-documentation/downloads/pdf/l
 
 == Inspirations
 
-Try the programming language Whiley.
-
-Try to make better than Rust.
-Some Rust pitfalls:
-
- * https://blog.yossarian.net/2020/05/20/Things-I-hate-about-rust
- * https://blog.yossarian.net/2022/03/10/Things-I-hate-about-Rust-redux
+ * Try the programming language Whiley.
+ * Try to make better than Rust.
+ ** Some Rust pitfalls:
+ *** https://blog.yossarian.net/2020/05/20/Things-I-hate-about-rust
+ *** https://blog.yossarian.net/2022/03/10/Things-I-hate-about-Rust-redux
+ * Look at Fortress: https://www.youtube.com/watch?v=EZD3Scuv02g
 
 == Avoiding complexity
 
@@ -107,6 +106,10 @@ fun test
         x
     )
 ----
+
+=== FFI
+
+Pre- and post-conditions can be used on FFI functions in order to use them safely.
 
 === Allocation failure
 
@@ -251,17 +254,6 @@ Or we can do lifetime elisions like in Rust.
 
 === Error handling
 
-It seems there's a limited set of actions you would take to handle errors.
-
- * Some errors only need to be logged.
- * Some errors should never happen and should abort.
- * Others can happen normally, but requires an action (EWOULDBLOCK).
-
-It seems however we cannot decide the action at the definition of the error because this is application-specific.
-
- * Should an application error handler be used?
- * If so, it seems like this wouldn't be sufficient as some errors require local handling instead of global.
-
 Perhaps just use Option and Result and provide some syntax similar to `let-else` in Rust:
 https://github.com/rust-lang/rfcs/blob/master/text/3137-let-else.md
 
@@ -298,6 +290,10 @@ that would require a call to validate_unicode(string) before calling those metho
  ** Perhaps some types could be compile-time types?
  * Think about how to make this more user-friendly. Perhaps with a good API like String::check_from(bytes).
 
+== Module system
+
+ * Anything we can do to avoid deep hierarchy?
+
 == Types
 
  * Limit tuples to pairs (might be a good idea to avoid having functions returning too much unnamed parameters).
@@ -329,6 +325,8 @@ ambiguity with multiplication (not sure it's possible if we allow operator overl
  * That could also be used to avoid having 2 methods: `unwrap_or()` and `unwrap_or_else()`: we could only have `unwrap_or()` that takes a lazy argument.
  * Forbid tabs (for indentations)?
  * match with end to avoid the issue with nested match?
+ * How to distinguish array indexing and function application with array argument?
+ * Non-transitive operator precedence (like in Fortress)? Is is necessary in a strongly-typed language?
 
 == Standard library
 
@@ -336,6 +334,7 @@ ambiguity with multiplication (not sure it's possible if we allow operator overl
  * Function unreachable where the compiler checks that it is indeed unreachable.
  ** Possibly with the pre-condition `false`?
  ** That would be useful for the `unwrap()` function:
+ * Maybe use algorithms from http://0x80.pl/articles/ to implement some algorithms in libstd.
 
 [source,ocaml]
 ----
@@ -351,11 +350,19 @@ Or do we allow non-exhaustive match when it's proven that the value is only one 
 === Iterators
 
  * I'd like to avoid having iterators, but that seems necessary for types like HashMap.
- * Look at what Go is doing for this.
+ * Look at what Go/Hare is doing for this.
 
 == Package manager (lumos)
 
 Read this article: https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527
+
+ * A GitHub repository would contain the index of all the packages.
+ * Publishing a new package would send a PR: the CI will check that semver is respected and auto-merge if the CI pass
+ and the CI (running on the master branch after the auto-merge) will update the index.
+ ** Security:
+ *** Auto-merge should only happen if the PR is a package update.
+ *** Anything touching files outside of a single package should stop the CI immediately.
+ *** Try to think of a better solution as this seems risky, security-wise.
 
 === Force semantic versioning?
 
@@ -413,6 +420,7 @@ Read more about diamond dependency problem.
  `library_module_function` that is compatible with C.
  ** We could even abuse this system for expressing extern C functions.
  *** Is this a good idea, though?
+ ** Look at what Hare does for this.
  ** What about generics?
  *** That's probably not an issue:
  **** The user can manually implement a dynamic version (with enums).
@@ -427,7 +435,11 @@ Read more about diamond dependency problem.
 == No-go
 
  * No implicit variant for enum.
- * RAII (but that seems useful for Rc) (the idea is to handle errors for Drop)
+ * RAII (but that seems useful for Rc) (the idea is to handle errors for Drop).
+ ** Maybe we can give the choice to the user: https://verdagon.dev/blog/raii-next-steps
+ ** If we don't have RAII, how would Rc work to drop its inner value?
+ *** Perhaps with a builtin type constraint Drop (that wouldn't be a destructor, though, in the sence that it won't
+ be automatically called by the compiler; it would only be called by Rc::drop).
  * Traits and OCaml-like modules: I believe those won't be needed thanks to predefined type constraints.
  * Inheritance.
  ** At some point, I thought of using inheritance for allowing to send a Vec to a function taking a slice, but that
@@ -435,3 +447,13 @@ Read more about diamond dependency problem.
     premature optimization.
  * Partial function application.
  * Any type of macros.
+ * Tail recursion.
+ * Error handling inspired by Common Lisp Condition System.
+ ** Former notes pointing in a similar direction:
+ *** It seems there's a limited set of actions you would take to handle errors.
+ **** Some errors only need to be logged.
+ **** Some errors should never happen and should abort.
+ **** Others can happen normally, but requires an action (EWOULDBLOCK).
+ *** It seems however we cannot decide the action at the definition of the error because this is application-specific.
+ **** Should an application error handler be used?
+ **** If so, it seems like this wouldn't be sufficient as some errors require local handling instead of global.
