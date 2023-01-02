@@ -79,6 +79,7 @@ let malloc(): ptr
  * Think about uninitialized values (from malloc).
  * What about partial initialization of structs?
  ** Is this something we want to allow?
+ ** Seems like it could be complex for structs containing structs.
  * No implicit free to avoid freeing uninitialized memory.
  * Functions to work with uninitialized memory.
 
@@ -110,6 +111,10 @@ fun test
 === FFI
 
 Pre- and post-conditions can be used on FFI functions in order to use them safely.
+
+=== Heap allocation
+
+ * Allow initializing directly on the heap?
 
 === Allocation failure
 
@@ -178,6 +183,8 @@ Having integer casts that work without truncation/wrapping, i.e. use pre-conditi
  * The user can write his own predicate that can be used in pre-conditions.
  * Those function require an attribute `#[predicate]`:
  * a predicate is limited in that it cannot call other functions.
+ * What to do for integer overflow?
+ * TODO: check if something needs to be done regarding variance.
 
 == User-friendliness
 
@@ -204,7 +211,9 @@ ensures is_unique(*T)
 
 Probably only libstd should be allowed to use special characters in types.
 
-`!` as an operator for `unwrap()` since unwrap is always safe.
+ * `!` as an operator for `unwrap()` since unwrap is always safe.
+ ** Not sure I like that. Maybe just use a refutable binding: `let Some(value) = option`.
+ *** What about chaining? If that happens often that we can prove things in such a case, `!` could be useful, for instance: `option!.get(value)!.method`. But I'm not sure this happens much.
 
 Genericity for references to allow `unwrap()` to either return T or &T and methods like `Map.get()` to take T or &T.
 Is this something we really want? Doesn't that make the compiler more complex? Is this something used often?
@@ -223,8 +232,9 @@ defer free()
 
 === Indexing
 
-Allow to use u8, u16, u32 and u64 instead of usize if their size (or value?) <= size_of(usize).
-Same for i8, i16, i32, i64 if they are greater than or equal to 0.
+ * Allow to use u8, u16, u32 and u64 instead of usize if their size (or value?) <= size_of(usize).
+ ** Same for i8, i16, i32, i64 if they are greater than or equal to 0.
+ * Check if post-conditions could be used to avoid having an entry API: could Nox know that an indexed value is valid after an insert (even in a HashMap)?
 
 === Arrays
 
@@ -246,6 +256,8 @@ If it's implicit, it means the compiler needs to do a whole program analysis bef
 Isn't it what the type inference do anyway?
 Or we can do lifetime elisions like in Rust.
 
+https://haibane-tenshi.github.io/rust-reborrowing/
+
 === Safe transmute
 
  * That might be useful to transmute a number/struct to an array of bytes, for instance to change the endianness.
@@ -257,9 +269,14 @@ Or we can do lifetime elisions like in Rust.
 Perhaps just use Option and Result and provide some syntax similar to `let-else` in Rust:
 https://github.com/rust-lang/rfcs/blob/master/text/3137-let-else.md
 
+ * Do we want to have nullable types instead of Option?
+
 The error in the Result type must implement Copy?
 
 == Performance.
+
+ * Maybe use pre-conditions to guide optimizations?
+ ** For instance, if we know that a shift value is <= 64, no need to mask it.
 
 === How to do zero-cost error handling?
 
@@ -297,6 +314,8 @@ that would require a call to validate_unicode(string) before calling those metho
 == Types
 
  * Limit tuples to pairs (might be a good idea to avoid having functions returning too much unnamed parameters).
+ ** Or even forbid pairs since we don't have closures (that would be a use case for iterator adapters).
+ *** Maybe allow them in match expressions?
 
 == Type system
 
@@ -305,6 +324,8 @@ that would require a call to validate_unicode(string) before calling those metho
  *** This is an interesting idea for functions, but not sure for generic structs.
  ** It actually use compile-time execution to check the time.
  * Having type constraints pre-defined in the language for generics like `eq`, `hash`.
+ * Forbid if expressions and other nested expressions as function arguments?
+ ** Perhaps have inline expressions (can be used as arguments) and non-inline expression.
 
 == Concurrency
 
@@ -325,6 +346,7 @@ ambiguity with multiplication (not sure it's possible if we allow operator overl
  * That could also be used to avoid having 2 methods: `unwrap_or()` and `unwrap_or_else()`: we could only have `unwrap_or()` that takes a lazy argument.
  * Forbid tabs (for indentations)?
  * match with end to avoid the issue with nested match?
+ ** What about the dangling else problem?
  * How to distinguish array indexing and function application with array argument?
  * Non-transitive operator precedence (like in Fortress)? Is is necessary in a strongly-typed language?
 
@@ -352,16 +374,18 @@ Or do we allow non-exhaustive match when it's proven that the value is only one 
  * I'd like to avoid having iterators, but that seems necessary for types like HashMap.
  * Look at what Go/Hare is doing for this.
 
-== Package manager (lumos)
+== Package manager
 
 Read this article: https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527
 
+ * See how go modules work.
  * A GitHub repository would contain the index of all the packages.
  * Publishing a new package would send a PR: the CI will check that semver is respected and auto-merge if the CI pass
  and the CI (running on the master branch after the auto-merge) will update the index.
  ** Security:
  *** Auto-merge should only happen if the PR is a package update.
  *** Anything touching files outside of a single package should stop the CI immediately.
+ **** Should think of a way to abort the CI when the CI file itself is changed.
  *** Try to think of a better solution as this seems risky, security-wise.
 
 === Force semantic versioning?
@@ -374,6 +398,8 @@ the major version of your library.
  * This also means that adding a new dependency is a major breaking change.
  * Maybe doing like Rust would prevent version numbers to go high quickly: having versions 0.x.y to behave differently
  than >= 1.0.0, i.e. a change of x is a major breaking change.
+ * The tool should check:
+ ** If there's an auto-trait removed.
 
 === Allow different versions of the same library?
 
@@ -416,6 +442,7 @@ Read more about diamond dependency problem.
  * Do we want an ABI compatible with C?
  ** That seems interesting for simplicity (won't have to implement unmangling in many tools like gdb/valgrind/…), but
  might be limiting (what to do for closures?).
+ ** Maybe not a good idea: https://faultlore.com/blah/c-isnt-a-language/
  ** An idea to support module would be to forbid underscores in identifiers to have the mangling
  `library_module_function` that is compatible with C.
  ** We could even abuse this system for expressing extern C functions.
@@ -430,7 +457,8 @@ Read more about diamond dependency problem.
 
 == Performance
 
- * Keep track of compilation speed and binary size compared to C.
+ * Keep track of compilation speed and binary size compared to C (gcc, clang) and D (because its compiler is fast).
+ * Can we optimize based on pre- and post- conditions?
 
 == No-go
 
