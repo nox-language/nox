@@ -115,6 +115,10 @@ Pre- and post-conditions can be used on FFI functions in order to use them safel
 === Heap allocation
 
  * Allow initializing directly on the heap?
+ ** That would probably require C+\\+-like constructor.
+ *** The compiler would make sure there are no uninitialized fields at the end of the constructor.
+ *** Since we don't want method overloading, would we want named constructor?
+ * Since we'll probably have constructor, we could have manually-called destructor for types containing other types (like Vec and Rc).
 
 === Allocation failure
 
@@ -125,7 +129,7 @@ https://harelang.org/blog/2021-04-28-oom-strategies/
 
 Summary:
 
- * Depending on whether the pointer type is nullable or not, panic (not nullable pointer) or return NULL (nullable pointer).
+ * Depending on whether the pointer type is nullable or not, abort (not nullable pointer) or return NULL (nullable pointer).
  ** Seems dangerous. We probably want to make this explicit.
  * Provide a keyword "static" on functions like append to mention that this will never alloc.
 
@@ -164,6 +168,8 @@ to not have to specify it at every call.
 We probably only want to compare some annotated types from libstd in the pre-conditions.
 
 Or perhaps we want to make this a config for the project (that seems like a bad idea, because that would forbid you to use some libraries).
+
+I'm not sure I want to support that level of genericity in the std. Kernel code could just use a different Vec type.
 
 === Checked dynamic arrays
 
@@ -273,11 +279,6 @@ https://github.com/rust-lang/rfcs/blob/master/text/3137-let-else.md
 
 The error in the Result type must implement Copy?
 
-== Performance.
-
- * Maybe use pre-conditions to guide optimizations?
- ** For instance, if we know that a shift value is <= 64, no need to mask it.
-
 === How to do zero-cost error handling?
 
  * Result requires to check for the error even when there are no errors.
@@ -295,6 +296,15 @@ fun myFunc() =
 
     failure(SomeError): // label SomeError
         handleError()
+
+Take inspiration from this: https://github.com/gamblevore/speedie/blob/main/Documentation/Errors.md
+
+Error traces (https://ziglang.org/documentation/master/#Error-Return-Traces) could be useful, but only in debug mode.
+
+ * Perhaps we can do like Go, e.g. returning tuples (value, err) and having the value uninitialized if there is an error.
+ ** That could reduce the boilerplate compared to pattern matching.
+ * Maybe `defer_err` would be useful for code only executing when returning an error, for instance to free some memory that doesn't need to be returned when there's an error.
+ ** Not sure how common this is, so perhaps it is not useful.
 
 == Strings
 
@@ -349,6 +359,10 @@ ambiguity with multiplication (not sure it's possible if we allow operator overl
  ** What about the dangling else problem?
  * How to distinguish array indexing and function application with array argument?
  * Non-transitive operator precedence (like in Fortress)? Is is necessary in a strongly-typed language?
+ * Owned pointers: `*mut` and `*` (const).
+ * Borrowed pointers: `&mut` and `&` (const).
+ ** What syntax to use to borrow from an owned pointer?
+ *** Is an operator useful for this? Is this useful to know at the call-site whether a pointer ownership is moved or not?
 
 == Standard library
 
@@ -432,7 +446,8 @@ Read more about diamond dependency problem.
 == Potential issues
 
  * Self-referencial structs (solution is unmovable types? maybe with a builtin type constraint?).
- * Intrusive lists: https://gist.github.com/Darksonn/1567538f56af1a8038ecc3c664a42462
+ ** Do we actually want to fix this issue? It seems only useful for intrusive lists which might not be a pattern that is that useful to support.
+ ** Intrusive lists: https://gist.github.com/Darksonn/1567538f56af1a8038ecc3c664a42462
  * Pattern matching smart pointer types.
  ** Seems unnecessarily complex, but it should work for normal heap-allocated values.
 
@@ -459,6 +474,7 @@ Read more about diamond dependency problem.
 
  * Keep track of compilation speed and binary size compared to C (gcc, clang) and D (because its compiler is fast).
  * Can we optimize based on pre- and post- conditions?
+ ** For instance, if we know that a shift value is <= 64, no need to mask it.
 
 == No-go
 
@@ -485,3 +501,4 @@ Read more about diamond dependency problem.
  *** It seems however we cannot decide the action at the definition of the error because this is application-specific.
  **** Should an application error handler be used?
  **** If so, it seems like this wouldn't be sufficient as some errors require local handling instead of global.
+ * Panics/exceptions.
