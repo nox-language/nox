@@ -118,6 +118,7 @@ Pre- and post-conditions can be used on FFI functions in order to use them safel
  ** That would probably require C+\\+-like constructor.
  *** The compiler would make sure there are no uninitialized fields at the end of the constructor.
  *** Since we don't want method overloading, would we want named constructor?
+ * Also support placement new.
  * Since we'll probably have constructor, we could have manually-called destructor for types containing other types (like Vec and Rc).
 
 === Allocation failure

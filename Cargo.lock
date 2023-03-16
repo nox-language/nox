@@ -18,7 +18,7 @@ dependencies = [
 [[package]]
 name = "rlvm"
 version = "0.0.2"
-source = "git+ssh://git@framagit.org/antoyo/rlvm.git#d13e1b9d03a28a04c06e15c9e07316ddb088e8a4"
+source = "git+https://github.com/antoyo/rlvm#e884a7e1acba2cb085eb04358ce53cf75b72e046"
 dependencies = [
  "cc",
 ]
