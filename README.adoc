@@ -1,1 +1,1 @@
-= This project was moved to https://gitlab.com/nox-language/nox[GitLab].
+= This project was moved to https://codeberg.org/nox-language/nox[Codeberg].
